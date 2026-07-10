@@ -1,8 +1,18 @@
-
 """
 GymStart — dein täglicher KI-Coach fürs Gym (Streamlit).
-Day-by-Day Journey für absolute Anfänger. Tagesinhalt wird von GPT-4o-mini
-individuell erzeugt; Kalorien/Makros exakt per Mifflin-St-Jeor in Python.
+
+Day-by-Day Journey für absolute Anfänger, wie im Konzept:
+- Onboarding -> exakte Kalorien/Makros (Mifflin-St Jeor, in Python, keine API)
+- Gym-Finder mit Empfehlung + Karte
+- Commit-Moment
+- Tägliche Timeline: Tag 1 mentale Vorbereitung, Tag 2 Ernährung, Tag 3 erster
+  Gymbesuch, Tag 4 erste Übungen, ab Tag 5 progressives Training / Ruhetage
+- Adaptive Logik (Feedback -> Schwierigkeit, 3x zu leicht -> Progressive Overload,
+  verpasster Tag -> Nachfrage, Gewichtsänderung -> neue Kalorien)
+- Wissens-Bereich (Etikette, Geräte-Guide, Supplements, Regeneration)
+- Fortschritt (Streaks, Meilensteine, Maße, Fotos, Makro-Log)
+- Paywall-Moment an Tag 14
+- Statischer Content ohne API; GPT-4o-mini NUR für Coaching-Text & Mahlzeiten.
 """
 import json
 import datetime
@@ -13,121 +23,120 @@ import streamlit as st
 st.set_page_config(page_title="GymStart", page_icon="💪", layout="centered",
                    initial_sidebar_state="collapsed")
 
-# ----------------------------------------------------------------------------
-# STYLING – warmes Orange/Grün, mobil-zentriert
-# ----------------------------------------------------------------------------
+# =============================================================================
+# STYLING – warmes helles Theme, erzwungen (auch bei Dark-Mode des Geräts)
+# =============================================================================
 st.markdown("""
 <style>
-  /* Immer heller Look – unabhängig vom Dark-Mode des Geräts */
   :root { color-scheme: light; }
   html, body, .stApp { background-color:#FFF9F5 !important; }
-  .block-container { max-width:520px; padding-top:1.2rem; padding-bottom:5rem; }
+  .block-container { max-width:540px; padding-top:1.1rem; padding-bottom:5rem; }
   #MainMenu, footer, header { visibility:hidden; }
 
-  /* Grundtext IMMER dunkel (verhindert weiß-auf-weiß) */
   .stApp, .stApp p, .stApp li, .stApp label, .stApp span,
   [data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] p,
   [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] *,
-  .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5 { color:#231A12; }
-  .stApp h1, .stApp h2, .stApp h3 { letter-spacing:-.3px; }
+  .stApp h1,.stApp h2,.stApp h3,.stApp h4,.stApp h5 { color:#231A12; }
+  .stApp h1,.stApp h2,.stApp h3 { letter-spacing:-.3px; }
   [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * { color:#8A7E73 !important; }
 
-  /* Eingaben & Auswahl: dunkler Text auf weiß */
   .stApp input, .stApp textarea { color:#231A12 !important; background-color:#fff !important; }
   [data-baseweb="select"] > div { background-color:#fff !important; }
   [data-baseweb="select"] div, [data-baseweb="popover"] li, [role="option"] { color:#231A12 !important; }
   [data-baseweb="popover"] li, [role="option"] { background-color:#fff !important; }
 
-  /* Buttons: sekundär weiß/dunkel, primär orange/weiß */
-  div.stButton > button { border-radius:14px; font-weight:700; padding:.6rem 1rem;
-      background:#fff; color:#231A12 !important; border:1.5px solid #F0E7DE; }
+  div.stButton > button { border-radius:14px; font-weight:700; padding:.55rem 1rem;
+      background:#fff; color:#231A12 !important; border:1.5px solid #F0E7DE; width:100%; }
   div.stButton > button[kind="primary"], div.stButton > button[kind="primary"] * {
       background:#FF7A1A !important; color:#fff !important; border:none; }
 
-  /* Karten & Elemente */
   .card { background:#fff; border:1px solid #F0E7DE; border-radius:20px;
           padding:18px 20px; margin:12px 0; box-shadow:0 8px 24px rgba(120,80,30,.07); }
-  .card p { color:#4a3f36 !important; line-height:1.55; margin:0; }
+  .card p { color:#4a3f36 !important; line-height:1.55; margin:0 0 6px; }
+  .card h3 { margin:0 0 8px; }
   .badge { display:inline-block; background:#FFF1E6; color:#FF7A1A !important; font-weight:700;
            font-size:12px; padding:6px 12px; border-radius:99px; }
   .badge.green { background:#E9F9F0; color:#27AE60 !important; }
-  .kcal { font-size:44px; font-weight:800; color:#FF7A1A !important; line-height:1; }
+  .kcal { font-size:46px; font-weight:800; color:#FF7A1A !important; line-height:1; }
   .muted { color:#8A7E73 !important; }
   .pill { display:inline-block; background:#fff5ec; color:#FF7A1A !important; font-size:12px;
-          font-weight:700; padding:5px 11px; border-radius:99px; margin:0 5px 5px 0;
-          border:1px solid #ffe4cc; }
+          font-weight:700; padding:5px 11px; border-radius:99px; margin:0 5px 6px 0; border:1px solid #ffe4cc; }
   .setpill { display:inline-block; background:#FFF1E6; color:#B5541A !important; font-weight:700;
              font-size:14px; padding:8px 13px; border-radius:12px; margin:4px 0 8px; }
-  .tip { background:#E9F9F0; border:1px solid #CDEFD9; border-radius:14px;
-         padding:12px 15px; color:#1c7a44 !important; font-size:14px; margin:10px 0; }
+  .tip { background:#E9F9F0; border:1px solid #CDEFD9; border-radius:14px; padding:12px 15px;
+         color:#1c7a44 !important; font-size:14px; margin:10px 0; }
   .tip b { color:#1c7a44 !important; }
-  .warn { background:#FFF3F0; border:1px solid #FFD9CF; border-radius:14px;
-          padding:12px 15px; color:#B5482E !important; font-size:14px; margin:8px 0; }
+  .warn { background:#FFF3F0; border:1px solid #FFD9CF; border-radius:14px; padding:12px 15px;
+          color:#B5482E !important; font-size:14px; margin:8px 0; }
   .warn b { color:#B5482E !important; }
-  .streak { background:linear-gradient(100deg,#FF7A1A,#FF9A4D); color:#fff !important;
-            border-radius:18px; padding:14px 20px; font-weight:800; font-size:20px;
-            margin:6px 0 4px; }
+  .streak { background:linear-gradient(100deg,#FF7A1A,#FF9A4D); border-radius:18px;
+            padding:14px 20px; font-weight:800; font-size:20px; margin:6px 0 4px; }
   .streak, .streak * { color:#fff !important; }
   .meal { display:flex; gap:12px; align-items:center; padding:11px 13px; background:#fff8f2;
           border-radius:14px; margin:8px 0; }
   .meal .mi { font-size:24px; } .meal .mt { font-weight:700; font-size:14px; color:#231A12 !important; }
-  .meal .md { font-size:12px; color:#8A7E73 !important; } .meal .mk { margin-left:auto; text-align:right;
-          font-size:12px; font-weight:700; color:#FF7A1A !important; }
+  .meal .md { font-size:12px; color:#8A7E73 !important; }
+  .meal .mk { margin-left:auto; text-align:right; font-size:12px; font-weight:700; color:#FF7A1A !important; }
+  .step { display:flex; gap:12px; margin-bottom:10px; align-items:flex-start; }
+  .step .num { min-width:26px; height:26px; border-radius:50%; background:#FFF1E6; color:#FF7A1A !important;
+               font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center; }
   .wkrow { display:flex; gap:14px; align-items:center; padding:12px; border-radius:14px;
            margin-bottom:8px; background:#fff8f2; border:1px solid #F0E7DE; }
   .wkrow.train { background:#FFF1E6; border-color:#ffe0c7; }
-  .wkday { width:46px; height:46px; border-radius:12px; background:#fff; display:flex;
-           align-items:center; justify-content:center; font-weight:800; border:1px solid #F0E7DE; color:#231A12; }
+  .wkday { width:46px; height:46px; border-radius:12px; background:#fff; display:flex; align-items:center;
+           justify-content:center; font-weight:800; border:1px solid #F0E7DE; color:#231A12 !important; }
   .wkrow.train .wkday { background:#FF7A1A; color:#fff !important; border-color:#FF7A1A; }
   .wktitle { font-weight:700; font-size:14.5px; color:#231A12 !important; }
   .wkfocus { font-size:12.5px; color:#8A7E73 !important; }
+  .dots { display:flex; gap:6px; flex-wrap:wrap; margin:4px 0 2px; }
+  .dot { width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+         font-size:12px; font-weight:800; background:#fff; border:2px solid #F0E7DE; color:#8A7E73 !important; }
+  .dot.done { background:#27AE60; border-color:#27AE60; color:#fff !important; }
+  .dot.today { background:#FF7A1A; border-color:#FF7A1A; color:#fff !important; box-shadow:0 0 0 4px #FFF1E6; }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ----------------------------------------------------------------------------
+# =============================================================================
 # STATE
-# ----------------------------------------------------------------------------
+# =============================================================================
 def init_state():
-    ss = st.session_state
-    ss.setdefault("phase", "onboarding")
-    ss.setdefault("profile", dict(weight=75, height=175, age=26, sex="Männlich",
-                                  bodytype="Normal", goal="Muskeln aufbauen",
-                                  exp="Noch nie im Gym", days=3, budget="20–40 €"))
-    ss.setdefault("gym", None)
-    ss.setdefault("start_date", None)
-    ss.setdefault("completed", set())
-    ss.setdefault("checklist", {})
-    ss.setdefault("feedback", {})
-    ss.setdefault("ai_content", {})
-    ss.setdefault("day_offset", 0)
-    ss.setdefault("premium", False)
-    ss.setdefault("view", "📅 Heute")
-    default_key = ""
-    try:
-        default_key = st.secrets.get("OPENAI_API_KEY", "")
-    except Exception:
-        default_key = ""
-    ss.setdefault("api_key", default_key)
+    d = st.session_state
+    d.setdefault("phase", "onboarding")
+    d.setdefault("profile", dict(weight=75, height=175, age=26, sex="Männlich",
+                                 bodytype="Normal", goal="Muskeln aufbauen",
+                                 exp="Noch nie im Gym", days=3, budget="20–40 €"))
+    d.setdefault("gym", None)
+    d.setdefault("start_date", None)
+    d.setdefault("completed", set())
+    d.setdefault("checklist", {})
+    d.setdefault("feedback", {})       # day -> "zu leicht"/"passt"/"zu schwer"
+    d.setdefault("ai_cache", {})       # day -> {"coaching":..,"meals":[..]}
+    d.setdefault("day_offset", 0)
+    d.setdefault("premium", False)
+    d.setdefault("view", "Heute")
+    d.setdefault("api_key", "")
+    d.setdefault("weight_log", [])     # [(date, weight)]
+    d.setdefault("measure_log", [])    # [{date, waist, arm, chest}]
+    d.setdefault("photos", [])         # [(date, bytes)]
+    d.setdefault("food_log", {})       # "YYYY-MM-DD" -> [{"name","protein","kcal"}]
+    d.setdefault("missed_handled", set())
 
 
 init_state()
 ss = st.session_state
 
 
-# ----------------------------------------------------------------------------
-# BERECHNUNGEN (Mifflin-St Jeor)
-# ----------------------------------------------------------------------------
+# =============================================================================
+# BERECHNUNGEN (Mifflin-St Jeor, keine API)
+# =============================================================================
 ACT = {2: 1.2, 3: 1.375, 4: 1.46, 5: 1.55}
 
 
 def bmr(p):
     base = 10 * p["weight"] + 6.25 * p["height"] - 5 * p["age"]
-    if p["sex"] == "Männlich":
-        return round(base + 5)
-    if p["sex"] == "Weiblich":
-        return round(base - 161)
-    return round(base - 78)  # divers: Mittelwert
+    return round(base + 5 if p["sex"] == "Männlich"
+                 else base - 161 if p["sex"] == "Weiblich" else base - 78)
 
 
 def tdee(p):
@@ -136,11 +145,7 @@ def tdee(p):
 
 def goal_kcal(p):
     t = tdee(p)
-    if p["goal"] == "Abnehmen":
-        return t - 350
-    if p["goal"] == "Muskeln aufbauen":
-        return t + 300
-    return t
+    return t - 350 if p["goal"] == "Abnehmen" else t + 300 if p["goal"] == "Muskeln aufbauen" else t
 
 
 def macro_split(p):
@@ -168,174 +173,245 @@ def plan_name(p):
     return "Ganzkörper-Basis"
 
 
-# ----------------------------------------------------------------------------
-# ÜBUNGEN (mit echten YouTube-Anleitungen)
-# ----------------------------------------------------------------------------
+# =============================================================================
+# ÜBUNGEN + WORKOUT-LOGIK (statisch, individualisiert)
+# =============================================================================
 EXERCISES = {
-    "Beinpresse":               dict(m="Beine & Po",       vid="dIhx9s2akVo", warn="Knie in Richtung Zehen — nie nach innen kippen."),
-    "Brustpresse (Maschine)":   dict(m="Brust & Trizeps",  vid="vfWqWby1PZ0", warn="Nicht im Hohlkreuz drücken — Rücken an die Lehne."),
-    "Latzug (Kabelzug)":        dict(m="Rücken & Bizeps",  vid="x4fHENgCi6o", warn="Nicht mit Schwung reißen — kontrolliert führen."),
-    "Rudern (Maschine)":        dict(m="Oberer Rücken",    vid="qPiF6y_HOBs", warn="Rücken nicht rund machen — Brust bleibt stolz."),
-    "Schulterpresse (Maschine)":dict(m="Schultern",        vid="3b3xodJR75U", warn="Nicht bis zum Anschlag durchdrücken."),
-    "Beinbeuger":               dict(m="Beinrückseite",    vid="1aJCM5ewSv8", warn="Kein Ruckeln im Endpunkt."),
-    "Bauchmaschine":            dict(m="Bauch",            vid="k3bF5LQAjB4", warn="Aus dem Bauch einrollen, nicht am Nacken ziehen."),
-    "Beinstrecker":             dict(m="Beinvorderseite",  vid="fIyf6iLZn5U", warn="Kein Schwung — Kontrolle vor Gewicht."),
+    "Beinpresse": dict(m="Beine & Po", vid="dIhx9s2akVo",
+                       setup="Rückenlehne aufrecht, Füße schulterbreit auf der Platte.",
+                       warn="Knie in Richtung Zehen bewegen — nie nach innen kippen und nicht ganz durchdrücken."),
+    "Brustpresse (Maschine)": dict(m="Brust & Trizeps", vid="vfWqWby1PZ0",
+                       setup="Griffe auf Höhe der mittleren Brust einstellen.",
+                       warn="Rücken bleibt an der Lehne, kein Hohlkreuz."),
+    "Latzug (Kabelzug)": dict(m="Rücken & Bizeps", vid="x4fHENgCi6o",
+                       setup="Beinpolster fixieren, Stange etwas weiter als schulterbreit greifen.",
+                       warn="Zur oberen Brust ziehen, nicht in den Nacken. Kein Reißen."),
+    "Rudern (Maschine)": dict(m="Oberer Rücken", vid="qPiF6y_HOBs",
+                       setup="Brust ans Polster, Sitzhöhe so, dass Griffe auf Bauchhöhe sind.",
+                       warn="Rücken gerade halten, Schulterblätter zusammenziehen."),
+    "Schulterpresse (Maschine)": dict(m="Schultern", vid="3b3xodJR75U",
+                       setup="Griffe starten auf Schulterhöhe.",
+                       warn="Nicht bis zum Anschlag durchdrücken."),
+    "Beinbeuger": dict(m="Beinrückseite", vid="1aJCM5ewSv8",
+                       setup="Polster knapp über der Ferse, Drehachse auf Kniehöhe.",
+                       warn="Langsam und ohne Schwung beugen und strecken."),
+    "Beinstrecker": dict(m="Beinvorderseite", vid="fIyf6iLZn5U",
+                       setup="Kniegelenk auf Drehachse, Polster über den Fußgelenken.",
+                       warn="Oben kurz halten, kontrolliert ablassen — kein Schwung."),
+    "Bauchmaschine": dict(m="Bauch", vid="k3bF5LQAjB4",
+                       setup="Griffe fassen, Brustpolster an der Brust.",
+                       warn="Aus dem Bauch einrollen, nicht am Nacken ziehen."),
 }
+EX_LIST = list(EXERCISES.keys())
 
 
-def find_exercise(name):
-    if not name:
-        return None
-    if name in EXERCISES:
-        return name, EXERCISES[name]
-    low = name.lower()
-    for k, v in EXERCISES.items():
-        first = k.lower().split(" ")[0]
-        if first in low or low.split(" ")[0] in k.lower():
-            return k, v
+def difficulty():
+    """3x 'zu leicht' -> Progressive Overload; 'zu schwer' -> leichter."""
+    easy = 0
+    for d in sorted(ss.feedback):
+        fb = ss.feedback[d]
+        easy = easy + 1 if fb == "zu leicht" else 0
+    base = 1.0 + 0.06 * min(easy, 5)
+    hard = sum(1 for v in ss.feedback.values() if v == "zu schwer")
+    return max(0.85, base - 0.05 * min(hard, 3))
+
+
+def overload_ready():
+    """True, wenn 3x in Folge 'zu leicht' -> Gewicht erhöhen."""
+    seq = [ss.feedback[d] for d in sorted(ss.feedback)]
+    run = 0
+    for f in seq:
+        run = run + 1 if f == "zu leicht" else 0
+    return run >= 3
+
+
+def training_day_number(day):
+    """Wie oft wurde bis zu diesem Journey-Tag trainiert (für Progression)."""
+    return sum(1 for d in range(4, day + 1) if is_training_day(d))
+
+
+def exercises_for(day):
+    n = training_day_number(day)
+    count = 3 if n <= 2 else 4 if n <= 6 else 5
+    start = (n * 2) % len(EX_LIST)
+    return [EX_LIST[(start + i) % len(EX_LIST)] for i in range(count)]
+
+
+def sets_reps(day):
+    n = training_day_number(day)
+    sets = 2 if n <= 3 else 3
+    reps = int(round((10 + n // 3) * difficulty()))
+    return sets, max(8, min(reps, 15))
+
+
+# Trainingsrhythmus ab Tag 5 (Ruhetage eingebaut)
+TRAIN_SLOTS = {2: {0, 3}, 3: {0, 2, 4}, 4: {0, 1, 3, 4}, 5: {0, 1, 2, 3, 4}}
+
+
+def is_training_day(day):
+    if day <= 3:
+        return False
+    if day == 4:
+        return True
+    idx = (day - 4) % 7
+    return idx in TRAIN_SLOTS.get(ss.profile["days"], {0, 2, 4})
+
+
+# =============================================================================
+# STATISCHER WISSENS-CONTENT
+# =============================================================================
+ETIKETTE = [
+    ("🧼", "Geräte abwischen", "Nach jeder Übung Schweiß mit dem Handtuch/Spray entfernen."),
+    ("🏋️", "Gewichte zurückräumen", "Hanteln und Scheiben zurück an ihren Platz."),
+    ("⏳", "Nicht blockieren", "Zwischen den Sätzen andere ranlassen, nicht am Handy sitzen bleiben."),
+    ("🤝", "Fragen ist okay", "Jeder war mal Anfänger. Personal fragt man ohne schlechtes Gewissen."),
+    ("👀", "Niemand schaut", "Alle sind mit sich selbst beschäftigt — wirklich."),
+]
+SUPPLEMENTS = [
+    ("✅", "Protein-Pulver", "Sinnvoll, wenn du dein Protein-Ziel über Essen nicht erreichst. Kein Muss."),
+    ("✅", "Kreatin (3–5 g/Tag)", "Das am besten erforschte Supplement. Günstig, wirkt, sicher."),
+    ("🟡", "Koffein", "Vor dem Training okay für mehr Fokus. Nicht spät am Tag."),
+    ("❌", "Fatburner", "Rausgeschmissenes Geld. Bringt fast nichts."),
+    ("❌", "BCAAs", "Überflüssig, wenn du genug Protein isst."),
+]
+REGEN = [
+    ("😴", "Schlaf", "7–9 Stunden. Muskeln wachsen in der Pause, nicht im Training."),
+    ("🦵", "Muskelkater", "Leichter Kater ist okay. Scharfer/stechender Schmerz = Pause."),
+    ("💧", "Trinken", "2–3 Liter Wasser über den Tag verteilt."),
+    ("🧘", "Ruhetage", "Mindestens 1–2 pro Woche. Dein Körper braucht die Erholung."),
+]
+BAG_ITEMS = ["🧻 Handtuch", "💧 Wasserflasche", "👟 Sportschuhe",
+             "👕 Sportklamotten", "🔒 Schloss für den Spind", "🎧 Kopfhörer (optional)"]
+
+
+# =============================================================================
+# KI (GPT-4o-mini) — NUR Coaching-Text & Mahlzeiten, mit statischem Fallback
+# =============================================================================
+def get_key():
+    """Key robust holen: erst Session, dann Streamlit-Secrets (Cloud)."""
+    k = (ss.get("api_key") or "").strip()
+    if k:
+        return k
+    try:
+        s = st.secrets.get("OPENAI_API_KEY", "")
+        if s:
+            return str(s).strip()
+    except Exception:
+        pass
+    return ""
+
+
+def key_source():
+    if (ss.get("api_key") or "").strip():
+        return "App-Eingabe"
+    try:
+        if st.secrets.get("OPENAI_API_KEY", ""):
+            return "Streamlit-Secrets"
+    except Exception:
+        pass
     return None
 
 
-# ----------------------------------------------------------------------------
-# OPENAI (serverseitig via urllib – kein CORS, Key aus st.secrets/Session)
-# ----------------------------------------------------------------------------
-def call_openai(payload):
-    key = ss.get("api_key", "")
+def _openai(payload):
+    key = get_key()
     if not key:
-        return {"error": "Kein API-Key. Trag ihn oben unter ⚙️ Menü ein "
-                         "oder hinterlege ihn in den Streamlit-Secrets."}
+        return None
     req = urllib.request.Request(
         "https://api.openai.com/v1/chat/completions",
         data=json.dumps(payload).encode(),
         headers={"Content-Type": "application/json", "Authorization": "Bearer " + key},
         method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=60) as r:
+        with urllib.request.urlopen(req, timeout=45) as r:
             return json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        body = e.read().decode()[:160]
-        return {"error": f"HTTP {e.code} — {body}"}
-    except Exception as e:
-        return {"error": str(e)}
+    except Exception:
+        return None
 
 
-def generate_day(day):
+def static_meals(m):
+    d = [.28, .12, .35, .25]
+    base = [("🥣", "Haferflocken + Skyr + Beeren", "Proteinreicher Start"),
+            ("🥜", "Nüsse + Apfel", "Schneller Snack"),
+            ("🍗", "Hähnchen/Tofu, Reis & Gemüse", "Klassiker fürs Ziel"),
+            ("🐟", "Lachs/Tofu + Kartoffeln", "Protein + gute Fette")]
+    return [dict(emoji=e, titel=t, beschreibung=b,
+                 kcal=round(m["kcal"] * d[i]), protein=round(m["protein"] * d[i]))
+            for i, (e, t, b) in enumerate(base)]
+
+
+def static_coaching(day):
     p = ss.profile
-    m = macros(p)
-    st_ = streak()
-    day_type = ("vorbereitung" if day == 1 else "ernaehrung" if day == 2
-                else "erster_gymbesuch" if day == 3 else "training")
-    last_fb = ss.feedback.get(day - 1)
-    allowed = ", ".join(EXERCISES.keys())
-    focus = {
-        "vorbereitung": "Fokus: mentale Vorbereitung fürs Gym, was den Anfänger erwartet, Gym-Etikette. KEIN Workout. 2-3 Abschnitte.",
-        "ernaehrung": "Fokus: Ernährung einfach erklären (Makros, Einkaufstipps). KEIN Workout. 2-3 Abschnitte.",
-        "erster_gymbesuch": "Fokus: der allererste Gymbesuch, Schritt für Schritt, nur orientieren. 3-4 Abschnitte als Schritte.",
-        "training": f"Fokus: Workout. Wähle 3-5 Übungen AUSSCHLIESSLICH aus dieser Liste (exakte Namen): {allowed}. Passe Sätze/Wiederholungen an — Anfänger starten leicht.",
-    }[day_type]
-    if day_type == "training":
-        schema = ('{"titel":"kurz (max 4 Wörter)","untertitel":"kurzer Fokus","motivation":"2-3 persönliche Sätze",'
-                  '"uebungen":[{"name":"EXAKT aus Liste","saetze":Zahl,"wdh":Zahl,"hinweis":"kurzer Formtipp"}],'
-                  '"mahlzeiten":[{"emoji":"🍳","titel":"...","beschreibung":"max 6 Wörter","kcal":Zahl,"protein":Zahl}],"tipp":"..."}')
-    else:
-        schema = ('{"titel":"kurz (max 4 Wörter)","untertitel":"kurzer Fokus","motivation":"2-3 persönliche Sätze",'
-                  '"abschnitte":[{"emoji":"🧠","ueberschrift":"...","text":"1-2 Sätze"}],'
-                  '"mahlzeiten":[{"emoji":"🍳","titel":"...","beschreibung":"max 6 Wörter","kcal":Zahl,"protein":Zahl}],"tipp":"..."}')
-    prompt = (
-        f"Nutzer: {p['age']} Jahre, {p['sex']}, {p['weight']} kg, {p['height']} cm, "
-        f"Körpertyp {p['bodytype']}. Ziel: {p['goal']}. Erfahrung: {p['exp']}. "
-        f"Trainiert {p['days']}× pro Woche.\n"
-        f"Tagesziel (bereits exakt berechnet — VERWENDE GENAU DIESE ZAHLEN, nicht selbst rechnen): "
-        f"{m['kcal']} kcal, {m['protein']} g Protein, {m['carbs']} g Carbs, {m['fat']} g Fett.\n"
-        f"Heute ist Tag {day} der Journey. Aktuelle Streak: {st_} Tage."
-        + (f" Feedback vom letzten Training: {last_fb}." if last_fb else "") + "\n"
-        f"{focus}\n"
-        f"Erzeuge personalisierten, auf genau diese Person zugeschnittenen Inhalt. "
-        f"Antworte NUR als JSON nach diesem Schema: {schema}")
-    payload = {
-        "model": "gpt-4o-mini", "temperature": 0.85,
-        "response_format": {"type": "json_object"},
-        "messages": [
-            {"role": "system", "content": "Du bist ein persönlicher Fitness-Coach für absolute Gym-Anfänger. Warm, motivierend, per Du, ohne Fachjargon. Antworte ausschließlich mit gültigem JSON."},
-            {"role": "user", "content": prompt},
-        ],
-    }
-    data = call_openai(payload)
-    if "error" in data:
-        return {"error": data["error"]}
-    try:
-        parsed = json.loads(data["choices"][0]["message"]["content"])
-        parsed["dayType"] = day_type
-        return parsed
-    except Exception as e:
-        return {"error": f"Antwort nicht lesbar: {e}"}
+    stk = streak()
+    if stk >= 7:
+        return f"Über eine Woche am Stück — das schaffen die wenigsten! Du bist längst dabei, {p['goal'].lower()} zur Gewohnheit zu machen."
+    if day == 1:
+        return "Willkommen. Heute geht's nur ums Ankommen im Kopf — kein Training, kein Druck. Ein Schritt nach dem anderen."
+    if stk >= 3:
+        return f"{stk} Tage Streak 🔥 Du bleibst dran — genau so entsteht Fortschritt. Weiter im Tempo."
+    return "Schön, dass du da bist. Heute machst du einfach deinen nächsten kleinen Schritt. Mehr braucht es nicht."
 
 
-# ----------------------------------------------------------------------------
-# ZEIT / STREAK
-# ----------------------------------------------------------------------------
+def ai_day(day):
+    """Gibt {coaching, meals} zurück – KI wenn Key da, sonst statisch."""
+    if day in ss.ai_cache:
+        return ss.ai_cache[day]
+    p, m = ss.profile, macros(ss.profile)
+    result = {"coaching": static_coaching(day), "meals": static_meals(m), "ai": False}
+    if get_key():
+        goal = p["goal"]
+        prompt = (
+            f"Person: {p['age']} J, {p['sex']}, {p['weight']}kg, {p['height']}cm, "
+            f"Körpertyp {p['bodytype']}, Ziel {goal}, Erfahrung {p['exp']}, Streak {streak()} Tage, "
+            f"heute Journey-Tag {day}. Tagesziel exakt: {m['kcal']} kcal, {m['protein']}g Protein, "
+            f"{m['carbs']}g Carbs, {m['fat']}g Fett (VERWENDE GENAU DIESE ZAHLEN).\n"
+            "Gib JSON: {\"coaching\":\"2-3 warme, motivierende Sätze, per Du, persönlich\","
+            "\"meals\":[{\"emoji\":\"🍳\",\"titel\":\"...\",\"beschreibung\":\"max 6 Wörter\","
+            "\"kcal\":Zahl,\"protein\":Zahl}]}. Genau 4 Mahlzeiten, deutsche Texte.")
+        data = _openai({"model": "gpt-4o-mini", "temperature": 0.85,
+                        "response_format": {"type": "json_object"},
+                        "messages": [
+                            {"role": "system", "content": "Du bist ein warmer Fitness-Coach für Anfänger. Antworte nur mit gültigem JSON."},
+                            {"role": "user", "content": prompt}]})
+        if data:
+            try:
+                parsed = json.loads(data["choices"][0]["message"]["content"])
+                if parsed.get("coaching"):
+                    result["coaching"] = parsed["coaching"]
+                if parsed.get("meals"):
+                    result["meals"] = parsed["meals"]
+                result["ai"] = True
+            except Exception:
+                pass
+    ss.ai_cache[day] = result
+    return result
+
+
+# =============================================================================
+# ZEIT / STREAK / GYMS
+# =============================================================================
 def current_day():
     if not ss.start_date:
         return 1
-    delta = (datetime.date.today() - ss.start_date).days
-    return max(1, delta + 1 + ss.day_offset)
+    return max(1, (datetime.date.today() - ss.start_date).days + 1 + ss.day_offset)
 
 
 def streak():
-    d = current_day()
     best = run = 0
-    for i in range(1, d + 1):
-        if i in ss.completed:
-            run += 1
-            best = max(best, run)
-        else:
-            run = 0
+    for i in range(1, current_day() + 1):
+        run = run + 1 if i in ss.completed else 0
+        best = max(best, run)
     return best
 
 
-def week_plan():
-    p = ss.profile
-    days = p["days"]
-    slots = {
-        2: [("Mo", 1), ("Do", 2)],
-        3: [("Mo", 1), ("Mi", 2), ("Fr", 3)],
-        4: [("Mo", 1), ("Di", 2), ("Do", 3), ("Fr", 4)],
-        5: [("Mo", 1), ("Di", 2), ("Mi", 3), ("Do", 4), ("Fr", 5)],
-    }.get(days, [("Mo", 1), ("Mi", 2), ("Fr", 3)])
-    splits = {
-        "Muskeln aufbauen": {
-            2: ["Ganzkörper A", "Ganzkörper B"],
-            3: ["Push · Brust, Schultern, Trizeps", "Pull · Rücken, Bizeps", "Beine & Bauch"],
-            4: ["Oberkörper", "Unterkörper", "Oberkörper", "Unterkörper"],
-            5: ["Push", "Pull", "Beine", "Oberkörper", "Unterkörper"],
-        }
-    }
-
-    def focus(i):
-        if p["goal"] == "Muskeln aufbauen":
-            return splits["Muskeln aufbauen"][days][i - 1]
-        if p["goal"] == "Abnehmen":
-            return "Ganzkörper + 15 Min Cardio"
-        return "Ganzkörper-Basis"
-
-    train = {tag: (i, focus(i)) for tag, i in slots}
-    out = []
-    for tag in ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]:
-        if tag in train:
-            out.append((tag, "train", train[tag][0], train[tag][1]))
-        else:
-            out.append((tag, "rest", None, "Erholung — Muskeln wachsen in der Pause."))
-    return out
-
-
-# ----------------------------------------------------------------------------
-# GYMS (Mock + Empfehlung)
-# ----------------------------------------------------------------------------
 GYMS = [
-    dict(id="g1", n="FitBox Discount",   dist=0.6, price=19, rating=4.1, feat=["Geräte", "Cardio", "24/7"]),
-    dict(id="g2", n="PowerHouse Gym",    dist=1.2, price=35, rating=4.6, feat=["Freie Gewichte", "Kurse", "Sauna", "Trainer"]),
-    dict(id="g3", n="Vital Club Premium",dist=2.1, price=59, rating=4.8, feat=["Sauna", "Pool", "Personal Trainer", "Kurse"]),
-    dict(id="g4", n="CityFit Basic",     dist=0.9, price=25, rating=4.0, feat=["Geräte", "Cardio", "Kurse"]),
+    dict(id="g1", n="FitBox Discount", dist=0.6, price=19, rating=4.1, lat=48.208, lon=16.363,
+         feat=["Geräte", "Cardio", "24/7"], hours="24/7"),
+    dict(id="g2", n="PowerHouse Gym", dist=1.2, price=35, rating=4.6, lat=48.216, lon=16.379,
+         feat=["Freie Gewichte", "Kurse", "Sauna", "Trainer"], hours="6–23 Uhr"),
+    dict(id="g3", n="Vital Club Premium", dist=2.1, price=59, rating=4.8, lat=48.198, lon=16.352,
+         feat=["Sauna", "Pool", "Personal Trainer", "Kurse"], hours="7–22 Uhr"),
+    dict(id="g4", n="CityFit Basic", dist=0.9, price=25, rating=4.0, lat=48.221, lon=16.371,
+         feat=["Geräte", "Cardio", "Kurse"], hours="6–23 Uhr"),
 ]
 
 
@@ -344,12 +420,11 @@ def budget_max():
 
 
 def ranked_gyms():
-    bmax = budget_max()
     goal = ss.profile["goal"]
+    bmax = budget_max()
     scored = []
     for g in GYMS:
-        s = g["rating"] * 10 - g["dist"] * 4
-        s += 25 if g["price"] <= bmax else -30
+        s = g["rating"] * 10 - g["dist"] * 4 + (25 if g["price"] <= bmax else -30)
         if goal == "Muskeln aufbauen" and "Freie Gewichte" in g["feat"]:
             s += 15
         if goal == "Abnehmen" and "Kurse" in g["feat"]:
@@ -359,13 +434,17 @@ def ranked_gyms():
     return [g for _, g in scored]
 
 
-# ----------------------------------------------------------------------------
-# VIEWS
-# ----------------------------------------------------------------------------
+def card(html):
+    st.markdown(f"<div class='card'>{html}</div>", unsafe_allow_html=True)
+
+
+# =============================================================================
+# ONBOARDING / RESULT / GYM / COMMIT
+# =============================================================================
 def view_onboarding():
-    st.markdown("## Gym<span style='color:#FF7A1A'>Start</span>", unsafe_allow_html=True)
+    st.markdown("# Gym<span style='color:#FF7A1A'>Start</span>", unsafe_allow_html=True)
     st.markdown("#### Erzähl uns von dir")
-    st.caption("Damit wir alles exakt für dich berechnen.")
+    st.caption("Damit wir alles exakt für dich berechnen — jeder erlebt eine andere App.")
     p = ss.profile
     c1, c2 = st.columns(2)
     p["weight"] = c1.number_input("Gewicht (kg)", 35, 250, p["weight"])
@@ -374,17 +453,19 @@ def view_onboarding():
     p["age"] = c3.number_input("Alter", 14, 90, p["age"])
     p["sex"] = c4.selectbox("Geschlecht", ["Männlich", "Weiblich", "Divers"],
                             index=["Männlich", "Weiblich", "Divers"].index(p["sex"]))
-    p["bodytype"] = st.selectbox("Aktueller Körpertyp", ["Sehr dünn", "Normal", "Übergewichtig"],
+    p["bodytype"] = st.selectbox("Körpertyp", ["Sehr dünn", "Normal", "Übergewichtig"],
                                  index=["Sehr dünn", "Normal", "Übergewichtig"].index(p["bodytype"]))
     p["goal"] = st.selectbox("Dein Ziel", ["Muskeln aufbauen", "Abnehmen", "Fitter werden", "Allgemeine Gesundheit"],
                              index=["Muskeln aufbauen", "Abnehmen", "Fitter werden", "Allgemeine Gesundheit"].index(p["goal"]))
-    p["exp"] = st.selectbox("Deine Gym-Erfahrung", ["Noch nie im Gym", "Kurz reingeschaut", "Leichte Erfahrung"],
+    p["exp"] = st.selectbox("Gym-Erfahrung", ["Noch nie im Gym", "Kurz reingeschaut", "Leichte Erfahrung"],
                             index=["Noch nie im Gym", "Kurz reingeschaut", "Leichte Erfahrung"].index(p["exp"]))
     p["days"] = st.select_slider("Tage pro Woche", [2, 3, 4, 5], p["days"])
     p["budget"] = st.selectbox("Budget fürs Gym", ["Bis 20 €", "20–40 €", "40 €+"],
                                index=["Bis 20 €", "20–40 €", "40 €+"].index(p["budget"]))
     st.divider()
-    if st.button("Plan berechnen ✨", type="primary", use_container_width=True):
+    if st.button("Plan berechnen ✨", type="primary"):
+        if not ss.weight_log:
+            ss.weight_log = [(datetime.date.today().isoformat(), p["weight"])]
         ss.phase = "result"
         st.rerun()
 
@@ -393,23 +474,17 @@ def view_result():
     p, m = ss.profile, macros(ss.profile)
     st.markdown("<div class='badge'>🎯 Auf dich zugeschnitten</div>", unsafe_allow_html=True)
     st.markdown("## Dein Plan steht.")
-    st.markdown(
-        f"<div class='card' style='text-align:center'>"
-        f"<div class='muted' style='letter-spacing:1px;font-size:12px'>DEIN TAGESZIEL</div>"
-        f"<div class='kcal'>{m['kcal']}</div><div class='muted'>kcal / Tag · {p['goal']}</div>"
-        f"<div style='display:flex;justify-content:space-around;margin-top:16px'>"
-        f"<div><div style='font-size:20px;font-weight:800;color:#27AE60'>{m['protein']}g</div><div class='muted' style='font-size:11px'>PROTEIN</div></div>"
-        f"<div><div style='font-size:20px;font-weight:800;color:#FF7A1A'>{m['carbs']}g</div><div class='muted' style='font-size:11px'>CARBS</div></div>"
-        f"<div><div style='font-size:20px;font-weight:800;color:#C79A2E'>{m['fat']}g</div><div class='muted' style='font-size:11px'>FETT</div></div>"
-        f"</div></div>", unsafe_allow_html=True)
-    st.markdown(
-        f"<div class='card'><h3 style='margin:0 0 6px'>🏋️ Dein Trainingsplan</h3>"
-        f"<b>{plan_name(p)}</b><br><span class='pill'>{p['days']}× / Woche</span>"
-        f"<span class='pill'>Start: Maschinen</span><span class='pill'>Progressive Overload</span></div>",
-        unsafe_allow_html=True)
-    st.caption(f"So berechnet: Grundumsatz {bmr(p)} kcal × Aktivität ({p['days']} Tage) "
-               f"= {tdee(p)} kcal → Ziel {m['kcal']} kcal.")
-    if st.button("Passendes Gym finden →", type="primary", use_container_width=True):
+    card(f"<div style='text-align:center'><div class='muted' style='letter-spacing:1px;font-size:12px'>DEIN TAGESZIEL</div>"
+         f"<div class='kcal'>{m['kcal']}</div><div class='muted'>kcal / Tag · {p['goal']}</div>"
+         f"<div style='display:flex;justify-content:space-around;margin-top:16px'>"
+         f"<div><div style='font-weight:800;color:#27AE60'>{m['protein']}g</div><div class='muted' style='font-size:11px'>PROTEIN</div></div>"
+         f"<div><div style='font-weight:800;color:#FF7A1A'>{m['carbs']}g</div><div class='muted' style='font-size:11px'>CARBS</div></div>"
+         f"<div><div style='font-weight:800;color:#C79A2E'>{m['fat']}g</div><div class='muted' style='font-size:11px'>FETT</div></div></div></div>")
+    card(f"<h3>🏋️ Dein Trainingsplan</h3><b>{plan_name(p)}</b><br>"
+         f"<span class='pill'>{p['days']}× / Woche</span><span class='pill'>Start: Maschinen</span>"
+         f"<span class='pill'>Progressive Overload</span>")
+    st.caption(f"So berechnet: Grundumsatz {bmr(p)} kcal × Aktivität ({p['days']} Tage) = {tdee(p)} kcal → Ziel {m['kcal']} kcal.")
+    if st.button("Passendes Gym finden →", type="primary"):
         ss.phase = "gym"
         st.rerun()
 
@@ -417,147 +492,150 @@ def view_result():
 def view_gym():
     st.markdown("## Wähle dein Gym")
     st.caption(f"Empfehlung nach Ziel & Budget (bis {ss.profile['budget']}).")
+    try:
+        import pandas as pd
+        st.map(pd.DataFrame([{"lat": g["lat"], "lon": g["lon"]} for g in GYMS]), zoom=12)
+    except Exception:
+        pass
     gyms = ranked_gyms()
     best = gyms[0]["id"]
     for g in gyms:
-        rec = " · ✅ Beste Wahl" if g["id"] == best else ""
-        st.markdown(
-            f"<div class='card'><div style='display:flex;justify-content:space-between'>"
-            f"<div><b>{g['n']}</b>{rec}<br><span class='muted' style='font-size:13px'>"
-            f"{g['dist']} km · {'⭐'*round(g['rating'])} {g['rating']}</span></div>"
-            f"<div style='font-weight:800;color:#FF7A1A'>{g['price']} €<br>"
-            f"<span class='muted' style='font-size:11px;font-weight:400'>/Monat</span></div></div>"
-            f"<div style='margin-top:8px'>{''.join(f'<span class=pill>{f}</span>' for f in g['feat'])}</div></div>",
-            unsafe_allow_html=True)
+        rec = "<div class='badge green' style='margin-top:8px'>✅ Für dein Ziel & Budget am besten</div>" if g["id"] == best else ""
+        card(f"<div style='display:flex;justify-content:space-between'>"
+             f"<div><b style='font-size:16px'>{g['n']}</b><br><span class='muted' style='font-size:13px'>"
+             f"{g['dist']} km · {'⭐'*round(g['rating'])} {g['rating']} · {g['hours']}</span></div>"
+             f"<div style='font-weight:800;color:#FF7A1A;text-align:right'>{g['price']} €<br>"
+             f"<span class='muted' style='font-size:11px;font-weight:400'>/Monat</span></div></div>"
+             f"<div style='margin-top:8px'>{''.join(f'<span class=pill>{f}</span>' for f in g['feat'])}</div>{rec}")
         if st.button(("✓ Ausgewählt" if ss.gym == g["id"] else "Dieses Gym wählen"),
-                     key="gym_" + g["id"], use_container_width=True,
-                     type=("primary" if ss.gym == g["id"] else "secondary")):
+                     key="gym_" + g["id"], type=("primary" if ss.gym == g["id"] else "secondary")):
             ss.gym = g["id"]
             st.rerun()
     st.divider()
-    if st.button("Weiter →", type="primary", use_container_width=True, disabled=not ss.gym):
+    if st.button("Weiter →", type="primary", disabled=not ss.gym):
         ss.phase = "commit"
         st.rerun()
 
 
 def view_commit():
     gym = next((g for g in GYMS if g["id"] == ss.gym), None)
-    st.markdown("<div style='text-align:center;margin-top:30px'><div style='font-size:60px'>🔥</div></div>",
-                unsafe_allow_html=True)
-    st.markdown("## Du bist bereit.")
-    st.markdown("Deine Journey beginnt **heute**. Kein Druck — ein Tag nach dem anderen.")
-    st.markdown(f"<div class='card'><span class='muted' style='font-size:13px'>Dein Gym</span><br>"
-                f"<b style='font-size:16px'>{gym['n'] if gym else ''}</b><br>"
-                f"<span class='muted' style='font-size:13px'>Erste 14 Tage komplett kostenlos.</span></div>",
-                unsafe_allow_html=True)
-    if st.button("Gym-Journey starten 🚀", type="primary", use_container_width=True):
+    st.markdown("<div style='text-align:center;margin-top:26px;font-size:60px'>🔥</div>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align:center'>Du bist bereit.</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align:center'>Deine Journey beginnt <b>heute</b>. Kein Druck — ein Tag nach dem anderen.</p>", unsafe_allow_html=True)
+    card(f"<span class='muted' style='font-size:13px'>Dein Gym</span><br><b style='font-size:16px'>{gym['n'] if gym else ''}</b>"
+         f"<br><span class='muted' style='font-size:13px'>Die ersten 14 Tage sind komplett kostenlos.</span>")
+    if st.button("Gym-Journey starten 🚀", type="primary"):
         ss.phase = "journey"
         ss.start_date = datetime.date.today()
         st.rerun()
 
 
+# =============================================================================
+# JOURNEY – Menü + Tagesinhalt
+# =============================================================================
 def top_nav():
     st.markdown("### Gym<span style='color:#FF7A1A'>Start</span>", unsafe_allow_html=True)
-    views = ["📅 Heute", "🗓 Wochenplan", "📈 Verlauf", "⚙️ Einstellungen"]
-    labels = ["📅 Heute", "🗓 Woche", "📈 Verlauf", "⚙️ Menü"]
-    cols = st.columns(4)
-    for col, lbl, v in zip(cols, labels, views):
-        if col.button(lbl, key="nav_" + v, use_container_width=True,
-                      type=("primary" if ss.view == v else "secondary")):
-            ss.view = v
-            st.rerun()
-    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+    labels = ["📅 Heute", "🗓 Woche", "📚 Wissen", "📊 Fortschritt", "⚙️ Menü"]
+    views = ["Heute", "Woche", "Wissen", "Fortschritt", "Menü"]
+    if ss.view not in views:
+        ss.view = "Heute"
+    choice = st.radio("nav", labels, index=views.index(ss.view),
+                      horizontal=True, label_visibility="collapsed")
+    ss.view = views[labels.index(choice)]
+    st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
 
 
-def render_meals(ai, m):
-    html = (f"<div class='card'><h3 style='margin:0 0 6px'>🍽️ Ernährung heute · {m['kcal']} kcal</h3>"
-            f"<div style='display:flex;justify-content:space-around;margin:6px 0 4px'>"
+def day_tracker(day):
+    dots = ""
+    for i in range(max(1, day - 3), day + 4):
+        cls = "done" if i in ss.completed else "today" if i == day else ""
+        label = "✓" if i in ss.completed else ("🔒" if i > day else str(i))
+        dots += f"<div class='dot {cls}'>{label}</div>"
+    st.markdown(f"<div class='dots'>{dots}</div>", unsafe_allow_html=True)
+
+
+def render_meals(m, meals):
+    html = (f"<h3>🍽️ Ernährung heute · {m['kcal']} kcal</h3>"
+            f"<div style='display:flex;justify-content:space-around;margin:2px 0 6px'>"
             f"<div><div style='font-weight:800;color:#27AE60'>{m['protein']}g</div><div class='muted' style='font-size:11px'>PROTEIN</div></div>"
             f"<div><div style='font-weight:800;color:#FF7A1A'>{m['carbs']}g</div><div class='muted' style='font-size:11px'>CARBS</div></div>"
             f"<div><div style='font-weight:800;color:#C79A2E'>{m['fat']}g</div><div class='muted' style='font-size:11px'>FETT</div></div></div>")
-    for x in ai.get("mahlzeiten", []):
+    for x in meals:
         html += (f"<div class='meal'><span class='mi'>{x.get('emoji','🍽️')}</span>"
                  f"<div><div class='mt'>{x.get('titel','')}</div><div class='md'>{x.get('beschreibung','')}</div></div>"
                  f"<div class='mk'>{x.get('kcal','')} kcal<br>{x.get('protein','')}g P</div></div>")
-    html += "</div>"
-    st.markdown(html, unsafe_allow_html=True)
+    card(html)
 
 
-def render_day(day, ai):
-    m = macros(ss.profile)
-    if ai.get("motivation"):
-        st.markdown(f"<div class='card'><p style='font-size:15px'>{ai['motivation']}</p></div>",
-                    unsafe_allow_html=True)
+def workout_block(day):
+    sets, reps = sets_reps(day)
+    st.markdown("### 🏋️ Heutiges Workout")
+    st.markdown(f"<div class='tip'>ℹ️ <b>Was bedeutet Sätze × Wiederholungen?</b> Eine <b>Wiederholung</b> ist eine "
+                f"komplette Bewegung. Ein <b>Satz</b> ist eine Runde am Stück — danach 1–2 Min Pause, dann der nächste Satz.</div>",
+                unsafe_allow_html=True)
+    if overload_ready():
+        st.markdown("<div class='badge'>🚀 Progressive Overload: Zeit, das Gewicht leicht zu erhöhen!</div>", unsafe_allow_html=True)
+    for name in exercises_for(day):
+        info = EXERCISES[name]
+        st.markdown(f"**{name}** · _{info['m']}_")
+        st.markdown(f"<div class='setpill'>🔁 {sets} Sätze × {reps} Wiederholungen · ⏱ ~90 Sek. Pause</div>", unsafe_allow_html=True)
+        st.video(f"https://www.youtube.com/watch?v={info['vid']}")
+        st.markdown(f"<div class='tip'>✅ <b>Einstellung:</b> {info['setup']}</div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='warn'>⚠️ {info['warn']}</div>", unsafe_allow_html=True)
+        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+    st.markdown("<p class='muted' style='font-size:13px'>💡 Einstiegsregel: So leicht, dass du fast lachst. Nächste Woche mehr.</p>", unsafe_allow_html=True)
 
-    for sec in ai.get("abschnitte", []):
-        st.markdown(f"<div class='card'><h3 style='margin:0 0 6px'>{sec.get('emoji','•')} "
-                    f"{sec.get('ueberschrift','')}</h3><p>{sec.get('text','')}</p></div>",
-                    unsafe_allow_html=True)
 
-    uebungen = ai.get("uebungen", [])
-    if uebungen:
-        st.markdown("### 🏋️ Heutiges Workout")
-        st.markdown(
-            "<div class='tip'>ℹ️ <b>Was bedeutet Sätze × Wiederholungen?</b> Eine "
-            "<b>Wiederholung</b> ist eine komplette Bewegung (z.B. einmal drücken und "
-            "zurück). Ein <b>Satz</b> ist eine Runde dieser Wiederholungen am Stück — "
-            "danach 1–2 Min Pause, dann der nächste Satz.</div>", unsafe_allow_html=True)
-        for u in uebungen:
-            found = find_exercise(u.get("name", ""))
-            name = found[0] if found else u.get("name", "")
-            info = found[1] if found else None
-            st.markdown(f"**{name}**" + (f" · _{info['m']}_" if info else ""))
-            st.markdown(f"<div class='setpill'>🔁 {u.get('saetze',3)} Sätze × "
-                        f"{u.get('wdh',10)} Wiederholungen · ⏱ ~90 Sek. Pause</div>",
-                        unsafe_allow_html=True)
-            if info:
-                st.video(f"https://www.youtube.com/watch?v={info['vid']}")
-            if u.get("hinweis"):
-                st.markdown(f"<div class='tip'>✅ {u['hinweis']}</div>", unsafe_allow_html=True)
-            if info:
-                st.markdown(f"<div class='warn'>⚠️ {info['warn']}</div>", unsafe_allow_html=True)
-            st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+def feedback_block(day):
+    st.markdown("### Wie war das Training?")
+    st.caption("Dein Feedback steuert die Schwierigkeit von morgen.")
+    fb = ss.feedback.get(day)
+    c1, c2, c3 = st.columns(3)
+    for col, label, val in [(c1, "😌 Zu leicht", "zu leicht"), (c2, "💪 Passt", "passt"), (c3, "🥵 Zu schwer", "zu schwer")]:
+        if col.button(label, key=f"fb_{day}_{val}", type=("primary" if fb == val else "secondary")):
+            ss.feedback[day] = val
+            st.rerun()
+    if fb:
+        st.success("Notiert — fließt in deinen morgigen Plan ein.")
 
-    render_meals(ai, m)
 
-    if ai.get("tipp"):
-        st.markdown(f"<div class='tip'>📌 <b>Tipp des Tages:</b> {ai['tipp']}</div>",
-                    unsafe_allow_html=True)
+def checklist_block():
+    st.markdown("### 🎒 Gym-Tasche packen")
+    for i, it in enumerate(BAG_ITEMS):
+        ss.checklist[i] = st.checkbox(it, value=ss.checklist.get(i, False), key=f"cl_{i}")
+    if all(ss.checklist.get(i) for i in range(len(BAG_ITEMS))):
+        st.success("🎉 Alles eingepackt — du bist startklar für morgen!")
 
-    # Tag 1: interaktive Gym-Tasche
-    if day == 1:
-        st.markdown("### 🎒 Gym-Tasche packen")
-        items = ["🧻 Handtuch", "💧 Wasserflasche", "👟 Sportschuhe",
-                 "👕 Sportklamotten", "🔒 Schloss für den Spind", "🎧 Kopfhörer (optional)"]
-        for i, it in enumerate(items):
-            ss.checklist[i] = st.checkbox(it, value=ss.checklist.get(i, False), key=f"cl_{i}")
-        if all(ss.checklist.get(i) for i in range(len(items))):
-            st.success("🎉 Alles eingepackt — du bist startklar!")
 
-    # Feedback an Trainingstagen
-    if uebungen:
-        st.markdown("### Wie war das Training?")
-        st.caption("Dein Feedback steuert, was dein Coach dir morgen gibt.")
-        cols = st.columns(3)
-        for col, (label, val) in zip(cols, [("😌 Zu leicht", "zu leicht"),
-                                            ("💪 Passt", "passt"), ("🥵 Zu schwer", "zu schwer")]):
-            active = ss.feedback.get(day) == val
-            if col.button(label, key=f"fb_{day}_{val}", use_container_width=True,
-                          type=("primary" if active else "secondary")):
-                ss.feedback[day] = val
-                st.rerun()
+def missed_banner(day):
+    """Verpasster Tag -> App fragt 'Was war los?'"""
+    prev = day - 1
+    if prev >= 1 and prev not in ss.completed and prev not in ss.missed_handled:
+        st.markdown(f"<div class='warn'>😕 Tag {prev} hast du nicht abgeschlossen. Was war los?</div>", unsafe_allow_html=True)
+        c1, c2, c3 = st.columns(3)
+        if c1.button("🤒 Krank", key=f"miss_sick_{prev}"):
+            ss.missed_handled.add(prev)
+            ss.feedback[prev] = "zu schwer"
+            st.toast("Erholung geht vor. Wir nehmen es sanfter.")
+            st.rerun()
+        if c2.button("⏳ Keine Zeit", key=f"miss_time_{prev}"):
+            ss.missed_handled.add(prev)
+            st.toast("Kein Problem — wir machen genau hier weiter.")
+            st.rerun()
+        if c3.button("✅ Nachgeholt", key=f"miss_done_{prev}"):
+            ss.completed.add(prev)
+            ss.missed_handled.add(prev)
+            st.rerun()
 
 
 def view_today():
     day = current_day()
-
     # Paywall an Tag 14
     if day >= 14 and not ss.premium and 14 not in ss.completed:
-        st.markdown("<div style='text-align:center'><div style='font-size:56px'>🏆</div></div>",
-                    unsafe_allow_html=True)
-        st.markdown("## 2 Wochen durchgehalten.")
-        st.markdown("Das schaffen die wenigsten. Ab jetzt wird's richtig ernst — dein Körper "
-                    "beginnt sich zu verändern.")
+        st.markdown("<div style='text-align:center;font-size:56px'>🏆</div>", unsafe_allow_html=True)
+        st.markdown("<h2 style='text-align:center'>2 Wochen durchgehalten.</h2>", unsafe_allow_html=True)
+        st.markdown("<p style='text-align:center'>Das schaffen die wenigsten. Ab jetzt wird's richtig ernst — "
+                    "dein Körper beginnt sich zu verändern.</p>", unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         c1.markdown("<div class='card' style='text-align:center'><div class='badge green'>−50% 🎉</div>"
                     "<h3 style='margin:8px 0 0'>Jahr</h3><div style='font-size:22px;font-weight:800'>59,99 €</div>"
@@ -565,103 +643,238 @@ def view_today():
         c2.markdown("<div class='card' style='text-align:center'><h3 style='margin:0'>Monat</h3>"
                     "<div style='font-size:22px;font-weight:800'>9,99 €</div>"
                     "<div class='muted' style='font-size:12px'>monatlich kündbar</div></div>", unsafe_allow_html=True)
-        if st.button("Weitermachen 🚀", type="primary", use_container_width=True):
+        if st.button("Weitermachen 🚀", type="primary"):
             ss.premium = True
             st.rerun()
         return
 
-    st.markdown(f"<div class='badge'>TAG {day} · "
-                f"{(datetime.date.today()+datetime.timedelta(days=ss.day_offset)).strftime('%A')}</div>",
-                unsafe_allow_html=True)
+    day_tracker(day)
+    weekday = (datetime.date.today() + datetime.timedelta(days=ss.day_offset)).strftime("%A")
+    st.markdown(f"<div class='badge'>TAG {day} · {weekday}</div>", unsafe_allow_html=True)
     if streak() > 0:
         st.markdown(f"<div class='streak'>🔥 {streak()} Tage Streak</div>", unsafe_allow_html=True)
+    missed_banner(day)
 
-    ai = ss.ai_content.get(day)
-    if not ai or "error" in ai:
-        if not ss.api_key:
-            st.markdown("## Dein KI-Coach fehlt noch")
-            st.warning("Trag oben unter **⚙️ Menü** deinen OpenAI-Key ein — dann "
-                       "erstellt dein Coach den heutigen Tag individuell für dich.")
-            return
-        with st.spinner("🤖 Dein Coach stellt deinen Tag zusammen …"):
-            ai = generate_day(day)
-            ss.ai_content[day] = ai
-        if "error" in ai:
-            st.error(f"Konnte den Tag nicht laden: {ai['error']}")
-            if st.button("🔄 Nochmal versuchen"):
-                ss.ai_content.pop(day, None)
-                st.rerun()
-            return
+    m = macros(ss.profile)
+    ai = ai_day(day)
+    training = is_training_day(day)
 
-    st.markdown(f"## {ai.get('titel','Dein Tag')}")
-    if ai.get("untertitel"):
-        st.caption(ai["untertitel"])
+    # Titel je nach Tag
+    titles = {1: "Mentale Vorbereitung", 2: "Ernährungs-Setup", 3: "Erster Gymbesuch", 4: "Erste echte Übungen"}
+    if day in titles:
+        title = titles[day]
+    elif training:
+        title = "Trainingstag"
+    else:
+        title = "Ruhetag & Erholung"
+    st.markdown(f"## {title}")
 
-    render_day(day, ai)
+    # Coaching-Nachricht (KI oder statisch)
+    card(f"<p style='font-size:15px;margin:0'>{ai['coaching']}</p>")
 
+    # --- Tagesspezifischer Content ---
+    if day == 1:
+        card("<h3>🧠 Was dich im Gym erwartet</h3><p>Kein Stress. Niemand schaut dich an — alle sind mit sich "
+             "selbst beschäftigt. Jeder war mal Anfänger. Dein einziges Ziel heute: ankommen.</p>")
+        html = "<h3>📜 Gym-Etikette</h3>"
+        for i, (e, t, d) in enumerate(ETIKETTE[:3], 1):
+            html += f"<div class='step'><div class='num'>{i}</div><div><b>{t}</b> — {d}</div></div>"
+        card(html)
+        card(f"<h3>🍽️ Deine erste Kalorien-Info</h3><p>Ab heute isst du <b style='color:#FF7A1A'>{m['kcal']} kcal</b> "
+             "pro Tag. Details kommen morgen — heute reicht: damit starten.</p>")
+        checklist_block()
+
+    elif day == 2:
+        card(f"<h3>📊 Deine Makros — einfach erklärt</h3>"
+             f"<p><b>Protein ({m['protein']}g)</b> baut Muskeln & hält satt. <b>Carbs ({m['carbs']}g)</b> geben "
+             f"Energie fürs Training. <b>Fett ({m['fat']}g)</b> hält Hormone im Lot. Zähl nicht jedes Gramm — komm grob hin.</p>")
+        card("<h3>🛒 Einkaufsliste</h3>" + "".join(
+            f"<span class='pill'>{x}</span>" for x in ["Haferflocken", "Skyr", "Eier", "Hähnchen/Tofu", "Reis",
+                                                       "Kartoffeln", "TK-Gemüse", "Beeren", "Nüsse", "Olivenöl"]))
+        render_meals(m, ai["meals"])
+        st.markdown("<div class='tip'>🎯 <b>Für morgen:</b> Nimm dir vor, tatsächlich ins Gym zu gehen — nur schauen. Tasche bereitlegen.</div>", unsafe_allow_html=True)
+
+    elif day == 3:
+        html = "<h3>👣 Dein erster Besuch — Schritt für Schritt</h3>"
+        steps = ["Empfang / Anmeldung — sag einfach: „Ich bin neu hier.“",
+                 "Umkleide & Spind — Sachen einschließen.",
+                 "Aufwärmen: 10 Min Laufband oder Fahrrad, locker.",
+                 "Tour: Freie Gewichte, Maschinen, Cardio — schau dich um.",
+                 "Diese 3 schaust du heute NUR an: Kniebeugen-Rack, Bankdrücken, Kreuzheben.",
+                 "Cool-down: 5 Min lockeres Dehnen. Fertig."]
+        for i, s in enumerate(steps, 1):
+            html += f"<div class='step'><div class='num'>{i}</div><div>{s}</div></div>"
+        card(html)
+        st.markdown("<div class='tip'>🌱 <b>Ziel heute:</b> ankommen, schauen, Atmosphäre spüren. Kein Training, kein Druck.</div>", unsafe_allow_html=True)
+
+    elif training:
+        workout_block(day)
+        render_meals(m, ai["meals"])
+
+    else:  # Ruhetag
+        html = "<h3>🧘 Heute ist Ruhetag</h3><p>Muskeln wachsen in der Pause. Nutze den Tag bewusst zur Erholung.</p>"
+        for e, t, d in REGEN:
+            html += f"<div class='step'><div class='num'>{e}</div><div><b>{t}</b> — {d}</div></div>"
+        card(html)
+        render_meals(m, ai["meals"])
+
+    # Feedback nur an Trainingstagen
+    if training:
+        feedback_block(day)
+
+    # Tagesabschluss
     st.divider()
     if day in ss.completed:
         st.success("✓ Heute erledigt — stark!")
     else:
-        if st.button(f"Tag {day} abschließen ✓", type="primary", use_container_width=True):
+        if st.button(f"Tag {day} abschließen ✓", type="primary"):
             ss.completed.add(day)
-            st.balloons()
+            for ms, txt in [(1, "🎉 Tag 1 geschafft!"), (3, "💪 Erster Gymbesuch!"),
+                            (7, "🔥 Eine ganze Woche!"), (30, "🏆 30 Tage!")]:
+                if day == ms:
+                    st.balloons()
             st.rerun()
-    if st.button("🔄 Tag neu generieren", use_container_width=True):
-        ss.ai_content.pop(day, None)
-        st.rerun()
 
 
 def view_week():
+    p = ss.profile
     st.markdown("## 🗓 Dein Wochenplan")
-    st.caption(f"{plan_name(ss.profile)} · {ss.profile['days']}× Training pro Woche. "
-               "So sieht eine typische Woche aus:")
-    for tag, typ, num, focus in week_plan():
-        if typ == "train":
+    st.caption(f"{plan_name(p)} · {p['days']}× Training pro Woche.")
+    slots = TRAIN_SLOTS.get(p["days"], {0, 2, 4})
+    focus_up = {2: ["Ganzkörper A", "Ganzkörper B"], 3: ["Push", "Pull", "Beine"],
+                4: ["Oberkörper", "Unterkörper", "Oberkörper", "Unterkörper"],
+                5: ["Push", "Pull", "Beine", "Oberkörper", "Unterkörper"]}.get(p["days"], ["Ganzkörper"])
+    tnum = 0
+    for i, tag in enumerate(["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]):
+        if i in slots:
+            f = focus_up[tnum % len(focus_up)] if p["goal"] == "Muskeln aufbauen" else \
+                ("Ganzkörper + Cardio" if p["goal"] == "Abnehmen" else "Ganzkörper-Basis")
+            tnum += 1
             st.markdown(f"<div class='wkrow train'><div class='wkday'>{tag}</div><div>"
-                        f"<div class='wktitle'>🏋️ Training {num}</div>"
-                        f"<div class='wkfocus'>{focus}</div></div></div>", unsafe_allow_html=True)
+                        f"<div class='wktitle'>🏋️ Training {tnum}</div><div class='wkfocus'>{f}</div></div></div>",
+                        unsafe_allow_html=True)
         else:
             st.markdown(f"<div class='wkrow'><div class='wkday'>{tag}</div><div>"
                         f"<div class='wktitle' style='color:#8A7E73'>😴 Ruhetag</div>"
-                        f"<div class='wkfocus'>{focus}</div></div></div>", unsafe_allow_html=True)
+                        f"<div class='wkfocus'>Erholung — Muskeln wachsen in der Pause.</div></div></div>",
+                        unsafe_allow_html=True)
 
 
-def view_history():
-    st.markdown("## 📈 Dein Verlauf")
-    d = current_day()
-    titles = {1: "Mentale Vorbereitung", 2: "Ernährungs-Setup", 3: "Erster Gymbesuch"}
-    for i in range(1, max(d + 2, 8)):
-        done = i in ss.completed
-        icon = "✅" if done else ("📍" if i == d else ("🔒" if i > d else "—"))
-        name = titles.get(i, "Trainingstag") if i > 3 or i in titles else "Trainingstag"
-        style = "opacity:.5" if i > d else ""
-        st.markdown(f"<div class='wkrow' style='{style}'><div class='wkday'>{icon}</div>"
-                    f"<div><div class='wktitle'>Tag {i} · {name}</div></div></div>",
-                    unsafe_allow_html=True)
+def view_knowledge():
+    st.markdown("## 📚 Wissen")
+    with st.expander("📜 Gym-Etikette — die ungeschriebenen Regeln", expanded=True):
+        for e, t, d in ETIKETTE:
+            st.markdown(f"**{e} {t}** — {d}")
+    with st.expander("🏋️ Geräte-Orientierung"):
+        st.caption("Die wichtigsten Anfänger-Maschinen, wofür sie sind und worauf du achtest.")
+        for name, info in EXERCISES.items():
+            st.markdown(f"**{name}** · _{info['m']}_")
+            st.markdown(f"<div class='tip'>✅ {info['setup']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='warn'>⚠️ {info['warn']}</div>", unsafe_allow_html=True)
+    with st.expander("💊 Supplement-Guide für Anfänger"):
+        for e, t, d in SUPPLEMENTS:
+            st.markdown(f"**{e} {t}** — {d}")
+    with st.expander("🛌 Regeneration & Erholung"):
+        for e, t, d in REGEN:
+            st.markdown(f"**{e} {t}** — {d}")
+
+
+def view_progress():
+    st.markdown("## 📊 Dein Fortschritt")
+    st.markdown(f"<div class='streak'>🔥 {streak()} Tage Streak · {len(ss.completed)} Tage erledigt</div>", unsafe_allow_html=True)
+
+    st.markdown("### 🏅 Meilensteine")
+    for need, txt in [(1, "Erster Tag"), (7, "Eine Woche"), (14, "Zwei Wochen"), (30, "Ein Monat")]:
+        done = len(ss.completed) >= need
+        st.markdown(f"{'✅' if done else '🔒'} {txt}")
+    if overload_ready():
+        st.markdown("🏋️ **Erstes Gewicht erhöht!** (3× „zu leicht“)")
+
+    st.markdown("### ⚖️ Gewicht")
+    c1, c2 = st.columns([2, 1])
+    nw = c1.number_input("Aktuelles Gewicht (kg)", 35, 250, ss.profile["weight"], key="nw")
+    if c2.button("Speichern", key="save_w"):
+        ss.profile["weight"] = nw
+        ss.weight_log.append((datetime.date.today().isoformat(), nw))
+        st.toast(f"Gespeichert — Kalorien neu berechnet: {macros(ss.profile)['kcal']} kcal/Tag")
+        st.rerun()
+    if len(ss.weight_log) >= 2:
+        try:
+            import pandas as pd
+            df = pd.DataFrame(ss.weight_log, columns=["Datum", "kg"]).set_index("Datum")
+            st.line_chart(df)
+        except Exception:
+            pass
+
+    st.markdown("### 📏 Maße (Umfänge)")
+    c1, c2, c3 = st.columns(3)
+    waist = c1.number_input("Taille cm", 40, 200, 80, key="ms_w")
+    arm = c2.number_input("Arm cm", 15, 70, 32, key="ms_a")
+    chest = c3.number_input("Brust cm", 60, 200, 95, key="ms_c")
+    if st.button("Maße speichern"):
+        ss.measure_log.append(dict(date=datetime.date.today().isoformat(), waist=waist, arm=arm, chest=chest))
+        st.toast("Maße gespeichert.")
+    if ss.measure_log:
+        st.caption(f"{len(ss.measure_log)} Einträge gespeichert. Zuletzt: {ss.measure_log[-1]}")
+
+    st.markdown("### 📸 Fortschritts-Fotos")
+    up = st.file_uploader("Foto hochladen", type=["jpg", "jpeg", "png"], key="photo_up")
+    if up and st.button("Foto speichern"):
+        ss.photos.append((datetime.date.today().isoformat(), up.getvalue()))
+        st.rerun()
+    if ss.photos:
+        cols = st.columns(3)
+        for i, (dte, b) in enumerate(ss.photos[-6:]):
+            cols[i % 3].image(b, caption=dte, use_container_width=True)
+
+    st.markdown("### 🍴 Makro-Log (heute)")
+    today = datetime.date.today().isoformat()
+    log = ss.food_log.setdefault(today, [])
+    c1, c2, c3 = st.columns([2, 1, 1])
+    fname = c1.text_input("Lebensmittel", key="food_name")
+    fprot = c2.number_input("Protein g", 0, 200, 20, key="food_prot")
+    fkcal = c3.number_input("kcal", 0, 2000, 300, key="food_kcal")
+    if st.button("Hinzufügen", key="add_food") and fname:
+        log.append(dict(name=fname, protein=fprot, kcal=fkcal))
+        st.rerun()
+    m = macros(ss.profile)
+    got_p = sum(x["protein"] for x in log)
+    got_k = sum(x["kcal"] for x in log)
+    st.markdown(f"<div class='tip'>Heute: <b>{got_p} / {m['protein']} g Protein</b> · {got_k} / {m['kcal']} kcal. "
+                f"Noch <b>{max(0, m['protein']-got_p)} g</b> Protein.</div>", unsafe_allow_html=True)
+    for x in log:
+        st.markdown(f"- {x['name']} · {x['protein']}g P · {x['kcal']} kcal")
 
 
 def view_settings():
-    st.markdown("## ⚙️ Einstellungen")
-    st.markdown("#### OpenAI API-Key")
-    ss.api_key = st.text_input("API-Key (sk-...)", value=ss.api_key, type="password",
-                               help="Nötig, damit dein Coach die Tage generiert.")
-    st.info("🔒 Beim Hosting auf Streamlit Cloud legst du den Key besser in den **Secrets** "
-            "ab (Menü → Settings → Secrets: `OPENAI_API_KEY=\"sk-...\"`). Dann müssen Nutzer "
-            "nichts eingeben. Kosten ~0,002 € pro Tag.")
+    st.markdown("## ⚙️ Menü & Einstellungen")
+    st.markdown("### 🤖 KI-Coach (optional)")
+    src = key_source()
+    if src:
+        st.success(f"✅ API-Key erkannt (Quelle: {src}). Der KI-Coach ist aktiv.")
+    else:
+        st.info("Ohne Key funktioniert die App voll — der KI-Coach nutzt dann feste Texte & Mahlzeiten. "
+                "Mit Key werden Coaching & Mahlzeiten individuell erzeugt.")
+    ss.api_key = st.text_input("OpenAI API-Key (überschreibt Secrets)", value=ss.api_key, type="password")
+    st.caption('Auf Streamlit Cloud besser unter Settings → Secrets: OPENAI_API_KEY = "sk-..."')
+
     st.divider()
-    st.markdown("#### Journey (Demo-Steuerung)")
+    st.markdown("### 🎯 Dein Gym")
+    gym = next((g for g in GYMS if g["id"] == ss.gym), None)
+    st.write(gym["n"] if gym else "—")
+
+    st.divider()
+    st.markdown("### ⏱ Journey (Demo-Steuerung)")
     st.caption("Im echten Betrieb schaltet sich täglich ein neuer Tag frei. Zum Ausprobieren:")
     c1, c2 = st.columns(2)
-    if c1.button("⏭ Nächster Tag", use_container_width=True):
+    if c1.button("⏭ Nächster Tag"):
         ss.day_offset += 1
         st.rerun()
-    if c2.button("⏮ Vorheriger Tag", use_container_width=True, disabled=ss.day_offset <= 0):
+    if c2.button("⏮ Vorheriger Tag", disabled=ss.day_offset <= 0):
         ss.day_offset = max(0, ss.day_offset - 1)
         st.rerun()
+
     st.divider()
-    st.markdown("#### Profil")
-    st.write(ss.profile)
     if st.button("🔁 App komplett zurücksetzen"):
         for k in list(ss.keys()):
             del ss[k]
@@ -670,12 +883,12 @@ def view_settings():
 
 def view_journey():
     top_nav()
-    {"📅 Heute": view_today, "🗓 Wochenplan": view_week,
-     "📈 Verlauf": view_history, "⚙️ Einstellungen": view_settings}[ss.view]()
+    {"Heute": view_today, "Woche": view_week, "Wissen": view_knowledge,
+     "Fortschritt": view_progress, "Menü": view_settings}[ss.view]()
 
 
-# ----------------------------------------------------------------------------
+# =============================================================================
 # ROUTER
-# ----------------------------------------------------------------------------
+# =============================================================================
 {"onboarding": view_onboarding, "result": view_result, "gym": view_gym,
  "commit": view_commit, "journey": view_journey}[ss.phase]()
