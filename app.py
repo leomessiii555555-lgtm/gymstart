@@ -1,3 +1,4 @@
+
 """
 GymStart — dein täglicher KI-Coach fürs Gym (Streamlit).
 Day-by-Day Journey für absolute Anfänger. Tagesinhalt wird von GPT-4o-mini
@@ -17,45 +18,69 @@ st.set_page_config(page_title="GymStart", page_icon="💪", layout="centered",
 # ----------------------------------------------------------------------------
 st.markdown("""
 <style>
-  .stApp { background:#FFF9F5; }
+  /* Immer heller Look – unabhängig vom Dark-Mode des Geräts */
+  :root { color-scheme: light; }
+  html, body, .stApp { background-color:#FFF9F5 !important; }
   .block-container { max-width:520px; padding-top:1.2rem; padding-bottom:5rem; }
   #MainMenu, footer, header { visibility:hidden; }
-  h1,h2,h3 { color:#231A12; letter-spacing:-.3px; }
+
+  /* Grundtext IMMER dunkel (verhindert weiß-auf-weiß) */
+  .stApp, .stApp p, .stApp li, .stApp label, .stApp span,
+  [data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] p,
+  [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] *,
+  .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5 { color:#231A12; }
+  .stApp h1, .stApp h2, .stApp h3 { letter-spacing:-.3px; }
+  [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * { color:#8A7E73 !important; }
+
+  /* Eingaben & Auswahl: dunkler Text auf weiß */
+  .stApp input, .stApp textarea { color:#231A12 !important; background-color:#fff !important; }
+  [data-baseweb="select"] > div { background-color:#fff !important; }
+  [data-baseweb="select"] div, [data-baseweb="popover"] li, [role="option"] { color:#231A12 !important; }
+  [data-baseweb="popover"] li, [role="option"] { background-color:#fff !important; }
+
+  /* Buttons: sekundär weiß/dunkel, primär orange/weiß */
+  div.stButton > button { border-radius:14px; font-weight:700; padding:.6rem 1rem;
+      background:#fff; color:#231A12 !important; border:1.5px solid #F0E7DE; }
+  div.stButton > button[kind="primary"], div.stButton > button[kind="primary"] * {
+      background:#FF7A1A !important; color:#fff !important; border:none; }
+
+  /* Karten & Elemente */
   .card { background:#fff; border:1px solid #F0E7DE; border-radius:20px;
           padding:18px 20px; margin:12px 0; box-shadow:0 8px 24px rgba(120,80,30,.07); }
-  .card p { color:#4a3f36; line-height:1.55; margin:0; }
-  .badge { display:inline-block; background:#FFF1E6; color:#FF7A1A; font-weight:700;
+  .card p { color:#4a3f36 !important; line-height:1.55; margin:0; }
+  .badge { display:inline-block; background:#FFF1E6; color:#FF7A1A !important; font-weight:700;
            font-size:12px; padding:6px 12px; border-radius:99px; }
-  .badge.green { background:#E9F9F0; color:#27AE60; }
-  .kcal { font-size:44px; font-weight:800; color:#FF7A1A; line-height:1; }
-  .muted { color:#8A7E73; }
-  .pill { display:inline-block; background:#fff5ec; color:#FF7A1A; font-size:12px;
+  .badge.green { background:#E9F9F0; color:#27AE60 !important; }
+  .kcal { font-size:44px; font-weight:800; color:#FF7A1A !important; line-height:1; }
+  .muted { color:#8A7E73 !important; }
+  .pill { display:inline-block; background:#fff5ec; color:#FF7A1A !important; font-size:12px;
           font-weight:700; padding:5px 11px; border-radius:99px; margin:0 5px 5px 0;
           border:1px solid #ffe4cc; }
-  .setpill { display:inline-block; background:#FFF1E6; color:#B5541A; font-weight:700;
+  .setpill { display:inline-block; background:#FFF1E6; color:#B5541A !important; font-weight:700;
              font-size:14px; padding:8px 13px; border-radius:12px; margin:4px 0 8px; }
   .tip { background:#E9F9F0; border:1px solid #CDEFD9; border-radius:14px;
-         padding:12px 15px; color:#1c7a44; font-size:14px; margin:10px 0; }
+         padding:12px 15px; color:#1c7a44 !important; font-size:14px; margin:10px 0; }
+  .tip b { color:#1c7a44 !important; }
   .warn { background:#FFF3F0; border:1px solid #FFD9CF; border-radius:14px;
-          padding:12px 15px; color:#B5482E; font-size:14px; margin:8px 0; }
-  .streak { background:linear-gradient(100deg,#FF7A1A,#FF9A4D); color:#fff;
+          padding:12px 15px; color:#B5482E !important; font-size:14px; margin:8px 0; }
+  .warn b { color:#B5482E !important; }
+  .streak { background:linear-gradient(100deg,#FF7A1A,#FF9A4D); color:#fff !important;
             border-radius:18px; padding:14px 20px; font-weight:800; font-size:20px;
             margin:6px 0 4px; }
+  .streak, .streak * { color:#fff !important; }
   .meal { display:flex; gap:12px; align-items:center; padding:11px 13px; background:#fff8f2;
           border-radius:14px; margin:8px 0; }
-  .meal .mi { font-size:24px; } .meal .mt { font-weight:700; font-size:14px; color:#231A12; }
-  .meal .md { font-size:12px; color:#8A7E73; } .meal .mk { margin-left:auto; text-align:right;
-          font-size:12px; font-weight:700; color:#FF7A1A; }
+  .meal .mi { font-size:24px; } .meal .mt { font-weight:700; font-size:14px; color:#231A12 !important; }
+  .meal .md { font-size:12px; color:#8A7E73 !important; } .meal .mk { margin-left:auto; text-align:right;
+          font-size:12px; font-weight:700; color:#FF7A1A !important; }
   .wkrow { display:flex; gap:14px; align-items:center; padding:12px; border-radius:14px;
            margin-bottom:8px; background:#fff8f2; border:1px solid #F0E7DE; }
   .wkrow.train { background:#FFF1E6; border-color:#ffe0c7; }
   .wkday { width:46px; height:46px; border-radius:12px; background:#fff; display:flex;
-           align-items:center; justify-content:center; font-weight:800; border:1px solid #F0E7DE; }
-  .wkrow.train .wkday { background:#FF7A1A; color:#fff; border-color:#FF7A1A; }
-  .wktitle { font-weight:700; font-size:14.5px; color:#231A12; }
-  .wkfocus { font-size:12.5px; color:#8A7E73; }
-  div.stButton > button { border-radius:14px; font-weight:700; padding:.6rem 1rem; }
-  div.stButton > button[kind="primary"] { background:#FF7A1A; border:none; }
+           align-items:center; justify-content:center; font-weight:800; border:1px solid #F0E7DE; color:#231A12; }
+  .wkrow.train .wkday { background:#FF7A1A; color:#fff !important; border-color:#FF7A1A; }
+  .wktitle { font-weight:700; font-size:14.5px; color:#231A12 !important; }
+  .wkfocus { font-size:12.5px; color:#8A7E73 !important; }
 </style>
 """, unsafe_allow_html=True)
 
