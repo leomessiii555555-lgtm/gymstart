@@ -180,6 +180,7 @@ def init_state():
     d.setdefault("food_log", {})       # "YYYY-MM-DD" -> [{"name","protein","kcal"}]
     d.setdefault("missed_handled", set())
     d.setdefault("swaps", {})          # f"{day}|{übung}" -> Alternativ-Übungsname
+    d.setdefault("workout_wish", {})   # day -> Freitext-Wunsch fürs Training
 
 
 init_state()
@@ -670,16 +671,22 @@ def ai_workout(day):
     if day in cache:
         return cache[day]
     default = {"name": session_for(day), "exercises": exercises_for(day), "focus": "", "reason": ""}
+    wish = (ss.get("workout_wish", {}).get(day) or "").strip()
     if get_key():
         p = ss.profile
         tnum = training_day_number(day)
         hist = recent_sessions(day)
         hist_txt = " | ".join(", ".join(m) for m in hist) if hist else "noch keine"
         avail = "; ".join(f"{k} ({v['m']})" for k, v in EXERCISES.items())
+        wish_txt = (f"\nWICHTIG – der Nutzer hat heute einen konkreten Wunsch: „{wish}“. "
+                    "Erfülle diesen Wunsch so gut es geht (z.B. gewünschte Muskelgruppe betonen), "
+                    "bleib dabei aber bei sinnvollem, sicherem Training. Erwähne den Wunsch kurz im 'reason'.\n"
+                    if wish else "")
         prompt = (
             "Du bist ein erfahrener Kraft- und Reha-Coach. Plane das heutige Workout durchdacht.\n"
             f"Person: {p['exp']}, Ziel {p['goal']}, trainiert {p['days']}× pro Woche, heute Trainingseinheit Nr. {tnum}.\n"
             f"Letzte Einheiten (Muskelgruppen, neueste zuerst): {hist_txt}.\n"
+            f"{wish_txt}"
             "Überlege wie ein Profi: In welcher Phase steht die Person? Welche Muskelgruppen wurden "
             "zuletzt vernachlässigt und sind heute dran (ausgewogene Erholung, jede Gruppe regelmäßig)? "
             "Wähle 4–5 Übungen AUSSCHLIESSLICH aus dieser Liste (exakte Namen verwenden):\n"
@@ -1208,6 +1215,26 @@ def workout_block(day):
     st.markdown(f"<div class='badge'>Heute: {focus}</div>", unsafe_allow_html=True)
     if w.get("reason"):
         st.markdown(f"<div class='tip'>🤖 <b>Warum heute diese Übungen:</b> {w['reason']}</div>", unsafe_allow_html=True)
+
+    # Eigener Wunsch: „Heute will ich lieber …“ — Coach passt das Workout an (nur mit KI-Key)
+    if get_key():
+        cur_wish = ss.get("workout_wish", {}).get(day, "")
+        wt = st.text_input("🎯 Heute lieber etwas Bestimmtes üben? (optional)", value=cur_wish,
+                           key=f"wish_in_{day}",
+                           placeholder="z.B. „mehr Beine“, „Fokus Bauch“, „kein Rücken heute“, „nur Oberkörper“")
+        c1, c2 = st.columns(2)
+        if c1.button("Workout anpassen ✨", key=f"wish_go_{day}", type="primary"):
+            ss.setdefault("workout_wish", {})[day] = (wt or "").strip()
+            ss.get("ai_workout", {}).pop(day, None)   # mit Wunsch neu generieren
+            st.rerun()
+        if cur_wish and c2.button("Wunsch zurücksetzen", key=f"wish_clr_{day}"):
+            ss.setdefault("workout_wish", {})[day] = ""
+            ss.get("ai_workout", {}).pop(day, None)
+            st.rerun()
+        if cur_wish:
+            st.markdown(f"<div class='tip'>🎯 <b>Dein Wunsch heute:</b> „{cur_wish}“ — dein Coach hat das Workout darauf abgestimmt.</div>",
+                        unsafe_allow_html=True)
+
     st.caption("Aufwärmen: 5 Min lockeres Cardio, dann bei jeder Übung 1 leichter Aufwärmsatz.")
     st.markdown("<div class='tip'>ℹ️ <b>Was bedeutet Sätze × Wiederholungen?</b> Eine <b>Wiederholung</b> ist eine "
                 "komplette Bewegung. Ein <b>Satz</b> ist eine Runde am Stück — danach 1–2 Min Pause, dann der nächste Satz.</div>",
@@ -1608,10 +1635,24 @@ def view_settings():
         ss.day_offset = max(0, ss.day_offset - 1)
         goto_today()
 
+    if ss.get("_user_email"):
+        st.divider()
+        st.markdown("### 👤 Konto")
+        st.caption(f"Angemeldet als **{ss.get('_user_name') or ss['_user_email']}**. "
+                   "Dein Fortschritt wird automatisch gespeichert.")
+        if ss.get("_db_error"):
+            st.caption(f"⚠️ {ss['_db_error']}")
+        if st.button("Abmelden"):
+            st.logout()
+
     st.divider()
     if st.button("🔁 App komplett zurücksetzen"):
+        keep = {k: ss[k] for k in ("_user_email", "_user_name") if k in ss}
         for k in list(ss.keys()):
             del ss[k]
+        ss.update(keep)
+        if keep:
+            ss["_loaded"] = True   # nicht erneut aus DB laden -> echter Reset
         st.rerun()
 
 
@@ -1622,7 +1663,160 @@ def view_journey():
 
 
 # =============================================================================
+# KONTO: Google-Login (st.login) + Speicherung pro Nutzer (Supabase) — OPTIONAL
+# Aktiv NUR, wenn in den Secrets [auth] bzw. SUPABASE_* konfiguriert sind.
+# Ohne Konfiguration läuft die App unverändert (ohne Login) weiter.
+# =============================================================================
+PERSIST_KEYS = ["phase", "profile", "start_date", "completed", "checklist",
+                "feedback", "day_offset", "premium", "weight_log", "measure_log",
+                "food_log", "missed_handled", "swaps", "workout_wish", "plan"]
+INT_KEY_DICTS = ["feedback", "workout_wish", "checklist"]
+
+
+def auth_configured():
+    try:
+        return bool(st.secrets.get("auth", {}).get("client_id")) and hasattr(st, "login")
+    except Exception:
+        return False
+
+
+def supabase_cfg():
+    try:
+        url = str(st.secrets.get("SUPABASE_URL", "")).strip().rstrip("/")
+        key = str(st.secrets.get("SUPABASE_KEY", "")).strip()
+        return (url, key) if url and key else None
+    except Exception:
+        return None
+
+
+def current_user():
+    try:
+        u = getattr(st, "user", None)
+        if u is not None and getattr(u, "is_logged_in", False):
+            return (u.email or "").lower(), (getattr(u, "name", "") or u.email or "")
+    except Exception:
+        pass
+    return None, None
+
+
+def _serialize():
+    out = {}
+    for k in PERSIST_KEYS:
+        if k not in ss:
+            continue
+        v = ss[k]
+        if isinstance(v, set):
+            out[k] = {"__set__": sorted(v, key=str)}
+        elif isinstance(v, datetime.date):
+            out[k] = v.isoformat()
+        else:
+            out[k] = v
+    return out
+
+
+def _deserialize(data):
+    if not isinstance(data, dict):
+        return
+    for k, v in data.items():
+        if isinstance(v, dict) and "__set__" in v:
+            v = set(v["__set__"])
+        ss[k] = v
+    sd = ss.get("start_date")
+    if isinstance(sd, str) and sd:
+        try:
+            ss["start_date"] = datetime.date.fromisoformat(sd)
+        except Exception:
+            ss["start_date"] = None
+    # Ganzzahl-Schlüssel wiederherstellen (JSON macht daraus Strings)
+    for k in INT_KEY_DICTS:
+        d = ss.get(k)
+        if isinstance(d, dict):
+            ss[k] = {(int(kk) if str(kk).lstrip("-").isdigit() else kk): vv
+                     for kk, vv in d.items()}
+
+
+def _sb_headers(key, extra=None):
+    h = {"apikey": key, "Authorization": "Bearer " + key, "Content-Type": "application/json"}
+    if extra:
+        h.update(extra)
+    return h
+
+
+def load_profile(email):
+    cfg = supabase_cfg()
+    if not cfg:
+        return
+    url, key = cfg
+    q = f"{url}/rest/v1/profiles?email=eq.{urllib.parse.quote(email)}&select=data"
+    try:
+        req = urllib.request.Request(q, headers=_sb_headers(key), method="GET")
+        with urllib.request.urlopen(req, timeout=15) as r:
+            rows = json.loads(r.read())
+        if rows and rows[0].get("data"):
+            _deserialize(rows[0]["data"])
+    except Exception as e:
+        ss["_db_error"] = f"Laden fehlgeschlagen: {e}"
+
+
+def save_profile(email):
+    cfg = supabase_cfg()
+    if not cfg:
+        return
+    url, key = cfg
+    body = json.dumps([{"email": email, "data": _serialize(),
+                        "updated_at": datetime.datetime.utcnow().isoformat()}]).encode()
+    try:
+        req = urllib.request.Request(
+            f"{url}/rest/v1/profiles?on_conflict=email", data=body,
+            headers=_sb_headers(key, {"Prefer": "resolution=merge-duplicates,return=minimal"}),
+            method="POST")
+        with urllib.request.urlopen(req, timeout=15) as r:
+            r.read()
+        ss["_db_error"] = ""
+    except Exception as e:
+        ss["_db_error"] = f"Speichern fehlgeschlagen: {e}"
+
+
+def auth_gate():
+    """Login-Screen zeigen und bei erstem Login den gespeicherten Stand laden."""
+    if not auth_configured():
+        return
+    email, name = current_user()
+    if not email:
+        st.markdown("# Gym<span style='color:#FF7A1A'>Start</span>", unsafe_allow_html=True)
+        st.markdown("### Willkommen 👋")
+        st.markdown("<p>Melde dich mit Google an — so bleiben dein aktueller Tag, deine Erfolge "
+                    "und dein Plan auf jedem Gerät gespeichert.</p>", unsafe_allow_html=True)
+        if st.button("Mit Google anmelden", type="primary"):
+            st.login()
+        st.stop()
+    ss["_user_email"] = email
+    ss["_user_name"] = name
+    if not ss.get("_loaded"):
+        load_profile(email)
+        ss["_loaded"] = True
+
+
+def persist_if_changed():
+    """Speichert den Stand nach jeder Änderung (nur eingeloggt + Supabase da)."""
+    email = ss.get("_user_email")
+    if not email or not supabase_cfg():
+        return
+    try:
+        cur = json.dumps(_serialize(), sort_keys=True, default=str)
+    except Exception:
+        return
+    if cur != ss.get("_last_saved"):
+        save_profile(email)
+        ss["_last_saved"] = cur
+
+
+# =============================================================================
 # ROUTER
 # =============================================================================
+auth_gate()   # zeigt ggf. Login-Screen (st.stop) und lädt den gespeicherten Stand
+
 {"onboarding": view_onboarding, "result": view_result, "days": view_days,
  "commit": view_commit, "journey": view_journey}[ss.phase]()
+
+persist_if_changed()   # speichert Änderungen automatisch (wenn eingeloggt)
