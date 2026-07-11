@@ -1040,7 +1040,7 @@ def view_onboarding():
 
 def view_result():
     p = ss.profile
-    with st.spinner("🤖 Dein Coach berechnet deinen Bedarf …"):
+    with st.spinner("🤖 Dein Coach berechnet deinen Bedarf … (kann bis zu 1 Minute dauern)"):
         m = plan()
     st.markdown("<div class='badge'>🎯 Auf dich zugeschnitten</div>", unsafe_allow_html=True)
     st.markdown("## Dein Plan steht.")
@@ -1332,7 +1332,7 @@ def view_today():
     training = is_training_day(day)
     need = get_key() and (day not in ss.ai_cache or (training and day not in ss.ai_workout))
     if need:
-        with st.spinner("🤖 Dein Coach stellt deinen Tag zusammen …"):
+        with st.spinner("🤖 Dein Coach stellt deinen Tag zusammen … (kann bis zu 1 Minute dauern)"):
             ai = ai_day(day)
             if training:
                 ai_workout(day)
@@ -1597,7 +1597,7 @@ def goto_today():
     ss.pending_view = "Heute"
     d = current_day()
     if get_key():
-        with st.spinner("🤖 Dein Coach stellt deinen Tag zusammen …"):
+        with st.spinner("🤖 Dein Coach stellt deinen Tag zusammen … (kann bis zu 1 Minute dauern)"):
             ai_day(d)
             if is_training_day(d):
                 ai_workout(d)
@@ -1678,8 +1678,9 @@ def view_journey():
 # =============================================================================
 PERSIST_KEYS = ["phase", "profile", "start_date", "completed", "checklist",
                 "feedback", "day_offset", "premium", "weight_log", "measure_log",
-                "food_log", "missed_handled", "swaps", "workout_wish", "plan"]
-INT_KEY_DICTS = ["feedback", "workout_wish", "checklist"]
+                "food_log", "missed_handled", "swaps", "workout_wish", "plan",
+                "ai_cache", "ai_workout"]   # KI-Tag mitspeichern -> bleibt beim Re-Login gleich
+INT_KEY_DICTS = ["feedback", "workout_wish", "checklist", "ai_cache", "ai_workout"]
 
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
