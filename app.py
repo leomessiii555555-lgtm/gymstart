@@ -334,6 +334,79 @@ EXERCISES = {
                        desc="Du drückst Stange oder Seil nach unten — formt die Rückseite des Oberarms.",
                        setup="Ellbogen eng am Körper fixieren, aufrecht stehen.",
                        warn="Nur die Unterarme bewegen sich — Ellbogen bleiben am Körper."),
+    # --- Erweiterung: weitere gängige Maschinen (alle mit geprüftem Video) ---
+    "V-Squat (Hackenschmidt)": dict(m="Beine & Po", vid="0Y9GHL5kL_Q",
+                       desc="Geführte Kniebeuge-Maschine: Du drückst dich über die Beine gegen ein Schulterpolster nach oben — starke Beinübung mit sicherer Führung.",
+                       setup="Schultern unter die Polster, Füße schulterbreit auf die Platte, Rücken angelehnt.",
+                       warn="Knie in Richtung Zehen, nicht ganz durchdrücken, nur so tief wie sauber."),
+    "Wadenheben-Maschine": dict(m="Waden", vid="6XQ38VxOyp0",
+                       desc="Du drückst dich über die Fußballen nach oben — trainiert gezielt die oft vergessenen Waden.",
+                       setup="Fußballen auf die Kante, Fersen frei, Polster auf Schultern oder Knien.",
+                       warn="Volle Bewegung: unten dehnen, oben kurz halten. Kein Wippen."),
+    "Abduktoren-Maschine": dict(m="Po & Beinaußenseite", vid="tESLPpvrRGM",
+                       desc="Du drückst die Knie gegen Polster nach außen — kräftigt Po und die seitliche Hüfte.",
+                       setup="Aufrecht sitzen, Polster außen an den Knien, Rücken angelehnt.",
+                       warn="Kontrolliert öffnen und schließen, nicht mit Schwung nach außen."),
+    "Adduktoren-Maschine": dict(m="Beininnenseite", vid="Vx8xOogv-og",
+                       desc="Du führst die Knie gegen Widerstand zusammen — trainiert die Innenseite der Oberschenkel.",
+                       setup="Aufrecht sitzen, Polster innen an den Knien, Rücken angelehnt.",
+                       warn="Langsam zusammenführen und öffnen, nicht ruckartig."),
+    "Rückenstrecker (Maschine)": dict(m="Unterer Rücken", vid="mhddol8ssTQ",
+                       desc="Du richtest den Oberkörper gegen die Schwerkraft auf — stärkt den unteren Rücken und die Körpermitte.",
+                       setup="Hüfte auf dem Polster, Fersen fixiert, Oberkörper frei.",
+                       warn="Nur bis zur geraden Linie aufrichten, nicht ins Hohlkreuz überstrecken.",
+                       wtxt="Erst nur Körpergewicht, später eine Hantelscheibe vor der Brust."),
+    "Seitheben-Maschine": dict(m="Schultern (seitlich)", vid="Xk-oRzoKFaw",
+                       desc="Du hebst die Arme gegen Polster seitlich an — formt die seitliche Schulter für eine breitere Optik.",
+                       setup="Aufrecht sitzen, Oberarme an die Polster, Ellbogen führen die Bewegung.",
+                       warn="Nur bis Schulterhöhe, Schultern nicht zum Ohr hochziehen."),
+    "Reverse Butterfly (Maschine)": dict(m="Hintere Schulter & oberer Rücken", vid="uXFjLXgIcYc",
+                       desc="Wie Butterfly, nur rückwärts: Du führst die Arme nach hinten — trainiert die hintere Schulter für eine gesunde Haltung.",
+                       setup="Brust ans Polster, Arme fast gestreckt, Griffe auf Schulterhöhe.",
+                       warn="Aus den Schulterblättern führen, nicht mit Schwung reißen."),
+    "Cable Cross (Kabelzug-Brust)": dict(m="Brust", vid="tL-1I_pg5mk",
+                       desc="Du führst zwei Kabelgriffe vor dem Körper zusammen — dehnt und formt die Brust über den vollen Bewegungsweg.",
+                       setup="Griffe oben einhängen, leichte Schrittstellung, Arme leicht gebeugt.",
+                       warn="Kontrolliert zusammenführen, Schulterblätter hinten lassen."),
+    "Klimmzug-/Dip-Maschine": dict(m="Rücken & Arme", vid="jl3pqU3Dp14",
+                       desc="Ein Polster nimmt dir Gewicht ab, sodass du Klimmzüge oder Dips sauber schaffst — ideal für den Einstieg.",
+                       setup="Auf das Polster knien/stellen, Gegengewicht so wählen, dass ~8 Wdh. gehen.",
+                       warn="Kontrolliert hoch und runter, unten voll ausstrecken.",
+                       wtxt="Gegengewicht so wählen, dass ~8 saubere Wiederholungen gehen."),
+    "Scott-Curl-Maschine": dict(m="Bizeps", vid="ajbryIHUcoo",
+                       desc="Die Oberarme liegen fest auf einem Schrägpolster — isoliert den Bizeps besonders sauber.",
+                       setup="Achseln ans obere Polsterende, Oberarme komplett auflegen.",
+                       warn="Unten nicht ruckartig durchstrecken — schont die Ellbogen."),
+    "Hip-Thrust-Maschine": dict(m="Po", vid="HW7Emnd61Bg",
+                       desc="Du drückst die Hüfte gegen ein Polster nach oben — die stärkste Maschine gezielt für den Po.",
+                       setup="Rücken ans Rückenpolster, Füße schulterbreit, Polster über der Hüfte.",
+                       warn="Oben den Po fest anspannen, kein Hohlkreuz — aus der Hüfte drücken."),
+    "Rotationsmaschine (Bauch)": dict(m="Seitliche Bauchmuskeln", vid="hgKbzySPctg",
+                       desc="Du drehst den Oberkörper gegen Widerstand zur Seite — trainiert die schräge Bauchmuskulatur.",
+                       setup="Aufrecht sitzen, Oberkörper fixieren, Bewegung nur aus dem Rumpf.",
+                       warn="Langsam und kontrolliert drehen, kein Schwung — schont die Wirbelsäule."),
+    "Dips-Maschine": dict(m="Brust & Trizeps", vid="jIQPDQJPXdE",
+                       desc="Du drückst dich zwischen zwei Griffen nach oben — kräftige Übung für Trizeps und untere Brust.",
+                       setup="Griffe fassen, Schultern tief, Oberkörper leicht vorgelehnt.",
+                       warn="Nur so tief, wie die Schulter schmerzfrei bleibt.",
+                       wtxt="An der assistierten Maschine mit Unterstützung starten."),
+    "Smith-Maschine (Kniebeuge)": dict(m="Beine & Po", vid="XuzmpMeOSDI",
+                       desc="Kniebeuge an der geführten Stange — sie läuft in einer Schiene, das gibt Sicherheit beim Lernen.",
+                       setup="Stange auf dem oberen Rücken (nicht Nacken), Füße etwas vor der Stange.",
+                       warn="Knie in Richtung Zehen, Rücken gerade, nur so tief wie sauber."),
+    "T-Bar Rudern (Maschine)": dict(m="Oberer Rücken", vid="v0FcLxplgBA",
+                       desc="Vorgebeugt ziehst du ein T-Griff-Gewicht zum Körper — baut einen breiten, dicken Rücken auf.",
+                       setup="Brust ans Polster (falls vorhanden), Rücken gerade, Griff fassen.",
+                       warn="Aus dem Rücken ziehen, Schulterblätter zusammen, kein Rundrücken."),
+    "Cable Crunch (Bauch am Kabel)": dict(m="Bauch", vid="HhJjrqdcyVE",
+                       desc="Kniend rollst du den Oberkörper gegen den Kabelzug ein — sehr effektiv für die geraden Bauchmuskeln.",
+                       setup="Vor dem Kabelturm knien, Seil hinter den Kopf, Hüfte fixieren.",
+                       warn="Aus dem Bauch einrollen, nicht aus der Hüfte ziehen."),
+    "Beinheben-Maschine": dict(m="Unterer Bauch", vid="DWSkW9wR7GI",
+                       desc="In der Armstütze hebst du die Beine an — trainiert gezielt den unteren Bauch.",
+                       setup="Unterarme auf die Polster, Rücken ans Polster, Schultern tief.",
+                       warn="Beine kontrolliert heben und senken, kein Schwung.",
+                       wtxt="Nur Körpergewicht — angewinkelte Beine sind leichter."),
 }
 EX_LIST = list(EXERCISES.keys())
 
@@ -351,6 +424,19 @@ START_WF = {
     "Butterfly (Brust)": (0.15, 0.28),
     "Bizeps-Curl (Maschine)": (0.10, 0.18),
     "Trizepsdrücken (Kabel)": (0.14, 0.26),
+    "V-Squat (Hackenschmidt)": (0.40, 0.70),
+    "Wadenheben-Maschine": (0.40, 0.75),
+    "Abduktoren-Maschine": (0.25, 0.45),
+    "Adduktoren-Maschine": (0.25, 0.45),
+    "Seitheben-Maschine": (0.08, 0.16),
+    "Reverse Butterfly (Maschine)": (0.10, 0.20),
+    "Cable Cross (Kabelzug-Brust)": (0.12, 0.22),
+    "Scott-Curl-Maschine": (0.10, 0.18),
+    "Hip-Thrust-Maschine": (0.40, 0.80),
+    "Rotationsmaschine (Bauch)": (0.12, 0.22),
+    "Smith-Maschine (Kniebeuge)": (0.30, 0.60),
+    "T-Bar Rudern (Maschine)": (0.25, 0.45),
+    "Cable Crunch (Bauch am Kabel)": (0.15, 0.30),
 }
 
 # Alternativen pro Übung – falls das genaue Gerät im Gym fehlt.
@@ -1083,6 +1169,9 @@ def render_exercise(day, i, base_name, sets, reps):
                     unsafe_allow_html=True)
     if info.get("vid"):
         st.video(f"https://www.youtube.com/watch?v={info['vid']}")
+        st.markdown(f"<a href='https://www.youtube.com/watch?v={info['vid']}' target='_blank' "
+                    f"style='font-size:12px;color:#8A7E73;text-decoration:none'>Video lädt nicht? ▶️ Auf YouTube ansehen</a>",
+                    unsafe_allow_html=True)
     else:
         st.markdown(f"<a href='{yt_search(name)}' target='_blank' "
                     f"style='color:#C2410C;font-weight:600;text-decoration:none'>▶️ {name} auf YouTube ansehen</a>",
@@ -1323,6 +1412,25 @@ def view_week():
                         unsafe_allow_html=True)
 
 
+GERAETE_GRUPPEN = ["Beine", "Brust", "Rücken", "Schultern", "Arme", "Bauch"]
+
+
+def muscle_group(m):
+    """Grobe Körperbereich-Zuordnung einer Übung anhand ihres Muskel-Textes."""
+    s = m.lower()
+    if "brust" in s:
+        return "Brust"
+    if "schulter" in s:
+        return "Schultern"
+    if "rücken" in s:
+        return "Rücken"
+    if "bizeps" in s or "trizeps" in s or "arme" in s:
+        return "Arme"
+    if "bauch" in s:
+        return "Bauch"
+    return "Beine"   # Beine & Po, Waden, Ab-/Adduktoren …
+
+
 def view_knowledge():
     st.markdown("## 📚 Wissen")
     sub = st.radio("wsub", ["📜 Etikette", "🏋️ Geräte", "💊 Supplements", "🛌 Regeneration"],
@@ -1334,17 +1442,19 @@ def view_knowledge():
             card(f"<b style='font-size:15.5px'>{e} {t}</b><br><span class='muted'>{d}</span>")
 
     elif sub == "🏋️ Geräte":
-        st.caption("Die wichtigsten Anfänger-Maschinen — mit Foto, wofür sie sind und worauf du achtest.")
-        for name, info in EXERCISES.items():
-            st.markdown(
-                f"<div class='gcard'>"
-                f"<img src='https://img.youtube.com/vi/{info['vid']}/hqdefault.jpg' alt='{name}'>"
-                f"<div class='gbody'>"
-                f"<div class='gname'>{name}<span class='gmus'>{info['m']}</span></div>"
-                f"<p style='margin:8px 0 0;color:#4a3f36'>{info['desc']}</p>"
-                f"<div class='tip'>🔧 <b>So stellst du es ein:</b> {info['setup']}</div>"
-                f"<div class='warn'>⚠️ <b>Achte darauf:</b> {info['warn']}</div>"
-                f"</div></div>", unsafe_allow_html=True)
+        st.caption("Alle wichtigen Maschinen — nach Körperbereich sortiert, jede mit Video, "
+                   "Einstellung und Sicherheits-Tipp.")
+        grp = st.radio("gg", GERAETE_GRUPPEN, horizontal=True, label_visibility="collapsed", key="ger_grp")
+        items = [(n, i) for n, i in EXERCISES.items() if muscle_group(i["m"]) == grp]
+        st.caption(f"{len(items)} Maschinen für {grp}")
+        for name, info in items:
+            st.markdown(f"### {name}")
+            st.markdown(f"<div class='badge'>{info['m']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<p style='margin:8px 0 4px;color:#3a3a3c'>{info['desc']}</p>", unsafe_allow_html=True)
+            st.video(f"https://www.youtube.com/watch?v={info['vid']}")
+            st.markdown(f"<div class='tip'>🔧 <b>So stellst du es ein:</b> {info['setup']}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div class='warn'>⚠️ <b>Achte darauf:</b> {info['warn']}</div>", unsafe_allow_html=True)
+            st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
     elif sub == "💊 Supplements":
         st.caption("Was wirklich sinnvoll ist — und was du dir sparen kannst.")
