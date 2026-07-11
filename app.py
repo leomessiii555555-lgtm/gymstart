@@ -177,6 +177,7 @@ def init_state():
     d.setdefault("photos", [])         # [(date, bytes)]
     d.setdefault("food_log", {})       # "YYYY-MM-DD" -> [{"name","protein","kcal"}]
     d.setdefault("missed_handled", set())
+    d.setdefault("swaps", {})          # f"{day}|{übung}" -> Alternativ-Übungsname
 
 
 init_state()
@@ -334,6 +335,167 @@ EXERCISES = {
 }
 EX_LIST = list(EXERCISES.keys())
 
+# Konservative Anfänger-Startgewichte als Anteil vom Körpergewicht (lo, hi).
+# Wird nach Geschlecht/Erfahrung/Fortschritt personalisiert (start_weight()).
+START_WF = {
+    "Beinpresse": (0.50, 0.80),
+    "Brustpresse (Maschine)": (0.22, 0.38),
+    "Latzug (Kabelzug)": (0.32, 0.50),
+    "Rudern (Maschine)": (0.30, 0.46),
+    "Schulterpresse (Maschine)": (0.14, 0.24),
+    "Beinbeuger": (0.20, 0.32),
+    "Beinstrecker": (0.24, 0.40),
+    "Bauchmaschine": (0.14, 0.24),
+    "Butterfly (Brust)": (0.15, 0.28),
+    "Bizeps-Curl (Maschine)": (0.10, 0.18),
+    "Trizepsdrücken (Kabel)": (0.14, 0.26),
+}
+
+# Alternativen pro Übung – falls das genaue Gerät im Gym fehlt.
+# Gleicher Muskel, ohne diese Maschine. Kein festes Video (Suchlink statt Embed).
+ALTS = {
+    "Beinpresse": [
+        {"name": "Goblet-Squat", "m": "Beine & Po",
+         "desc": "Kniebeuge, bei der du eine Kurzhantel vor der Brust hältst — trainiert Beine und Po ganz ohne Maschine.",
+         "setup": "Füße schulterbreit, Hantel dicht am Körper, Brust aufrecht.",
+         "warn": "Knie in Richtung Zehen, Rücken gerade, nur so tief wie es sauber geht.",
+         "wtxt": "Start mit leichter Kurzhantel (~6–10 kg) — erst die Technik."},
+        {"name": "Ausfallschritte", "m": "Beine & Po",
+         "desc": "Großer Schritt nach vorn, hinteres Knie absenken — starke Übung für Beine und Po.",
+         "setup": "Oberkörper aufrecht, Schritt so groß, dass beide Knie ~90° sind.",
+         "warn": "Vorderes Knie bleibt über dem Fuß, nicht nach innen kippen.",
+         "wtxt": "Zuerst nur Körpergewicht, später leichte Kurzhanteln."},
+    ],
+    "Brustpresse (Maschine)": [
+        {"name": "Kurzhantel-Bankdrücken", "m": "Brust & Trizeps",
+         "desc": "Auf einer Flachbank drückst du zwei Kurzhanteln nach oben — baut Brust, Schultern und Trizeps.",
+         "setup": "Rücken flach auf der Bank, Hanteln auf Brusthöhe starten.",
+         "warn": "Handgelenke gerade, kontrolliert, nicht bis zum Anschlag zusammenführen.",
+         "wtxt": "Start ~2×5–8 kg, Technik vor Gewicht."},
+        {"name": "Liegestütze", "m": "Brust & Trizeps",
+         "desc": "Klassische Liegestütze mit dem eigenen Körpergewicht — Brust und Arme, überall machbar.",
+         "setup": "Hände etwas breiter als schulterbreit, Körper bildet eine gerade Linie.",
+         "warn": "Hüfte nicht durchhängen lassen; zu schwer? Auf den Knien starten.",
+         "wtxt": "Nur Körpergewicht — auf den Knien leichter."},
+    ],
+    "Latzug (Kabelzug)": [
+        {"name": "Klimmzüge (unterstützt)", "m": "Rücken & Bizeps",
+         "desc": "An der Klimmzugmaschine oder mit Band ziehst du dich hoch — top für den breiten Rücken.",
+         "setup": "Griff etwas breiter als schulterbreit; Unterstützung so, dass ~8 Wdh. gehen.",
+         "warn": "Kontrolliert hoch und runter, nicht schwungvoll reißen.",
+         "wtxt": "Unterstützung/Band so wählen, dass es fordert, aber machbar ist."},
+        {"name": "Kurzhantel-Rudern", "m": "Rücken & Bizeps",
+         "desc": "Vorgebeugt ziehst du eine Kurzhantel zum Körper — kräftigt den Rücken ohne Kabelzug.",
+         "setup": "Ein Knie auf der Bank, Rücken gerade, Hantel frei hängen lassen.",
+         "warn": "Aus dem Rücken ziehen statt aus dem Arm reißen, Rücken bleibt gerade.",
+         "wtxt": "Start ~5–8 kg pro Hand."},
+    ],
+    "Rudern (Maschine)": [
+        {"name": "Kurzhantel-Rudern (einarmig)", "m": "Oberer Rücken",
+         "desc": "Einarmig ziehst du eine Kurzhantel zum Körper — stärkt oberen Rücken und Haltung.",
+         "setup": "Eine Hand und ein Knie auf der Bank, Rücken parallel zum Boden.",
+         "warn": "Nicht verdrehen, Schulter nach hinten-unten ziehen.",
+         "wtxt": "Start ~5–8 kg."},
+        {"name": "Kabelrudern (sitzend)", "m": "Oberer Rücken",
+         "desc": "Sitzend ziehst du einen Griff am Kabel zum Bauch — für den mittleren Rücken.",
+         "setup": "Leicht gebeugte Knie, aufrecht sitzen, Schulterblätter zusammenziehen.",
+         "warn": "Oberkörper ruhig halten, nicht mit dem Rumpf schwingen.",
+         "wtxt": "Leicht beginnen, sauber ziehen."},
+    ],
+    "Schulterpresse (Maschine)": [
+        {"name": "Kurzhantel-Schulterdrücken", "m": "Schultern",
+         "desc": "Sitzend oder stehend drückst du zwei Kurzhanteln über den Kopf — formt die Schultern.",
+         "setup": "Hanteln auf Schulterhöhe, Rücken gerade, Bauch fest.",
+         "warn": "Kein Hohlkreuz, nicht bis zum Anschlag durchdrücken.",
+         "wtxt": "Start ~2×3–6 kg."},
+        {"name": "Seitheben", "m": "Schultern",
+         "desc": "Mit leichten Kurzhanteln hebst du die Arme seitlich an — für runde Schultern.",
+         "setup": "Ellbogen leicht gebeugt, bis Schulterhöhe heben.",
+         "warn": "Ganz leicht wählen, ohne Schwung — sonst geht's in den Nacken.",
+         "wtxt": "Sehr leicht: ~2×2–4 kg."},
+    ],
+    "Beinbeuger": [
+        {"name": "Rumänisches Kreuzheben (Kurzhanteln)", "m": "Beinrückseite",
+         "desc": "Mit fast gestreckten Beinen senkst du die Hanteln entlang der Beine — dehnt und kräftigt die Beinrückseite.",
+         "setup": "Leichte Kniebeugung, Hüfte nach hinten schieben, Rücken gerade.",
+         "warn": "Rücken immer gerade, Hanteln nah am Bein führen.",
+         "wtxt": "Leicht starten: ~2×5–8 kg, Technik ist alles."},
+        {"name": "Beinbeuger am Band", "m": "Beinrückseite",
+         "desc": "Im Stehen beugst du ein Bein gegen ein Band — trainiert die Beinrückseite ohne Maschine.",
+         "setup": "Band am Knöchel, festhalten, Oberschenkel ruhig lassen.",
+         "warn": "Langsam beugen und strecken, kein Schwung.",
+         "wtxt": "Widerstand leicht wählen."},
+    ],
+    "Beinstrecker": [
+        {"name": "Goblet-Squat", "m": "Beinvorderseite",
+         "desc": "Kniebeuge mit Kurzhantel vor der Brust — kräftigt die Oberschenkelvorderseite.",
+         "setup": "Füße schulterbreit, aufrecht, Hantel am Körper.",
+         "warn": "Knie in Richtung Zehen, sauber tief gehen.",
+         "wtxt": "Leichte Kurzhantel ~6–10 kg."},
+        {"name": "Ausfallschritte", "m": "Beinvorderseite",
+         "desc": "Großer Schritt nach vorn, hinteres Knie senken — fordert die vordere Oberschenkelmuskulatur.",
+         "setup": "Aufrecht, beide Knie ~90°.",
+         "warn": "Vorderes Knie über dem Fuß halten.",
+         "wtxt": "Erst Körpergewicht, dann leichte Hanteln."},
+    ],
+    "Bauchmaschine": [
+        {"name": "Crunches", "m": "Bauch",
+         "desc": "Auf der Matte rollst du den Oberkörper ein — klassisches Bauchtraining ohne Gerät.",
+         "setup": "Auf dem Rücken, Beine angewinkelt, Hände an den Schläfen.",
+         "warn": "Aus dem Bauch einrollen, nicht am Kopf/Nacken ziehen.",
+         "wtxt": "Nur Körpergewicht."},
+        {"name": "Plank (Unterarmstütz)", "m": "Bauch",
+         "desc": "Du hältst den Körper im Unterarmstütz gerade — stärkt die ganze Rumpfmitte.",
+         "setup": "Ellbogen unter den Schultern, Körper in einer Linie.",
+         "warn": "Hüfte nicht durchhängen oder hochschieben; mit 15–20 Sek. starten.",
+         "wtxt": "Nur Körpergewicht, Haltezeit langsam steigern."},
+    ],
+    "Butterfly (Brust)": [
+        {"name": "Kurzhantel-Fliegende", "m": "Brust",
+         "desc": "Liegend führst du zwei Kurzhanteln im Bogen über der Brust zusammen — isoliert die Brust.",
+         "setup": "Flach auf der Bank, Arme leicht gebeugt, weiter Bogen.",
+         "warn": "Nicht zu tief, kontrolliert — schont die Schultern.",
+         "wtxt": "Leicht: ~2×3–6 kg."},
+        {"name": "Liegestütze", "m": "Brust",
+         "desc": "Liegestütze mit Körpergewicht treffen die Brust ganz ohne Gerät.",
+         "setup": "Hände etwas breiter als schulterbreit, Körper gerade.",
+         "warn": "Hüfte gerade halten; auf den Knien leichter.",
+         "wtxt": "Nur Körpergewicht."},
+    ],
+    "Bizeps-Curl (Maschine)": [
+        {"name": "Kurzhantel-Curls", "m": "Bizeps",
+         "desc": "Im Stehen beugst du Kurzhanteln zur Schulter — baut den Bizeps auf.",
+         "setup": "Ellbogen am Körper, Oberarme ruhig halten.",
+         "warn": "Nicht mit dem Rücken schwingen, kontrolliert beugen.",
+         "wtxt": "Start ~2×4–7 kg."},
+        {"name": "Langhantel-Curls", "m": "Bizeps",
+         "desc": "Mit einer Langhantel beugst du beide Arme gemeinsam — der Bizeps-Klassiker.",
+         "setup": "Schulterbreiter Untergriff, Ellbogen am Körper.",
+         "warn": "Rücken gerade, kein Schwung aus der Hüfte.",
+         "wtxt": "Leere oder leichte Stange zum Start."},
+    ],
+    "Trizepsdrücken (Kabel)": [
+        {"name": "Trizeps-Dips (Bank)", "m": "Trizeps",
+         "desc": "Hände auf einer Bank hinter dir, du senkst und drückst den Körper — Trizeps mit Körpergewicht.",
+         "setup": "Hände schulterbreit auf der Bankkante, Füße vor dir.",
+         "warn": "Nur so tief, wie die Schulter schmerzfrei bleibt.",
+         "wtxt": "Körpergewicht; Beine anwinkeln = leichter."},
+        {"name": "Kurzhantel-Überkopf-Trizeps", "m": "Trizeps",
+         "desc": "Eine Kurzhantel hinter dem Kopf strecken — formt die Rückseite des Oberarms.",
+         "setup": "Ellbogen zeigen nach vorn-oben, Oberarme ruhig.",
+         "warn": "Ellbogen eng lassen, langsam absenken.",
+         "wtxt": "Leicht: ~1×4–8 kg."},
+    ],
+}
+
+
+def alt_info(base, alt_name):
+    """Alternativ-Übung (Dict) zu einer Basis-Übung finden – oder None."""
+    for a in ALTS.get(base, []):
+        if a["name"] == alt_name:
+            return a
+    return None
+
 
 def difficulty():
     """3x 'zu leicht' -> Progressive Overload; 'zu schwer' -> leichter."""
@@ -460,6 +622,42 @@ def sets_reps(day):
     sets = 2 if n <= 3 else 3
     reps = int(round((10 + n // 3) * difficulty()))
     return sets, max(8, min(reps, 15))
+
+
+# --- Gesunde Startgewichts-Empfehlung (personalisiert, konservativ) -----------
+SEX_F = {"Männlich": 1.0, "Weiblich": 0.65, "Divers": 0.82}
+EXP_F = {"Noch nie im Gym": 0.85, "Kurz reingeschaut": 1.0, "Leichte Erfahrung": 1.12}
+
+
+def round25(x):
+    """Auf 2,5-kg-Schritte runden (typische Geräte-/Hantelstufen)."""
+    return max(2.5, round(x / 2.5) * 2.5)
+
+
+def fmt_kg(x):
+    return f"{x:g}"
+
+
+def start_weight(name):
+    """Empfohlener Start-Kilobereich (lo, hi) für eine Maschinen-Übung, sonst None.
+    Basis: Körpergewicht × muskelabhängiger Anteil, skaliert nach Geschlecht,
+    Erfahrung und aktuellem Fortschritt (difficulty). Bewusst eher niedrig."""
+    wf = START_WF.get(name)
+    if not wf:
+        return None
+    p = ss.profile
+    f = SEX_F.get(p["sex"], 1.0) * EXP_F.get(p["exp"], 1.0) * difficulty()
+    lo = round25(p["weight"] * wf[0] * f)
+    hi = round25(p["weight"] * wf[1] * f)
+    if hi <= lo:
+        hi = lo + 2.5
+    return lo, hi
+
+
+def yt_search(name):
+    """Zuverlässiger YouTube-Such-Link (statt evtl. falschem Embed) für Alternativen."""
+    return "https://www.youtube.com/results?search_query=" + urllib.parse.quote(
+        f"{name} richtig ausführen Anfänger")
 
 
 # Trainingsrhythmus (Fallback, falls keine Wochentage gewählt)
@@ -770,6 +968,56 @@ def render_meals(m, meals):
     card(html)
 
 
+def render_exercise(day, i, base_name, sets, reps):
+    """Eine Übung darstellen — inkl. Startgewicht und Alternativ-Auswahl,
+    falls das Gerät im Gym fehlt. Ein Swap ersetzt die Übung nur für heute."""
+    key = f"{day}|{base_name}"
+    swap = ss.swaps.get(key)
+    info = alt_info(base_name, swap) if swap else EXERCISES[base_name]
+    if info is None:                       # Swap-Ziel nicht gefunden -> Original
+        swap, info = None, EXERCISES[base_name]
+    name = swap or base_name
+    tag = " · Alternative" if swap else ""
+    st.markdown(f"**{i}. {name}**{tag} · _{info['m']}_")
+    st.markdown(f"<div class='setpill'>🔁 {sets} Sätze × {reps} Wiederholungen · ⏱ ~90 Sek. Pause</div>",
+                unsafe_allow_html=True)
+    sw = start_weight(name)
+    if sw:
+        st.markdown(f"<div class='muted' style='font-size:13px;margin:-4px 0 8px'>🏋️ Startgewicht ≈ "
+                    f"<b>{fmt_kg(sw[0])}–{fmt_kg(sw[1])} kg</b> · taste dich langsam heran</div>",
+                    unsafe_allow_html=True)
+    elif info.get("wtxt"):
+        st.markdown(f"<div class='muted' style='font-size:13px;margin:-4px 0 8px'>🏋️ {info['wtxt']}</div>",
+                    unsafe_allow_html=True)
+    if info.get("vid"):
+        st.video(f"https://www.youtube.com/watch?v={info['vid']}")
+    else:
+        st.markdown(f"<a href='{yt_search(name)}' target='_blank' "
+                    f"style='color:#C2410C;font-weight:600;text-decoration:none'>▶️ {name} auf YouTube ansehen</a>",
+                    unsafe_allow_html=True)
+    st.markdown(f"<div class='tip'>✅ <b>Einstellung:</b> {info['setup']}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='warn'>⚠️ {info['warn']}</div>", unsafe_allow_html=True)
+    alts = ALTS.get(base_name, [])
+    if alts:
+        open_key = f"swopen_{key}"
+        if st.button("🔄 Dieses Gerät hast du nicht? Alternative wählen", key=f"swbtn_{key}"):
+            ss[open_key] = not ss.get(open_key, False)
+            st.rerun()
+        if ss.get(open_key):
+            st.caption("Wähle, was dein Gym hat — alle trainieren denselben Muskel.")
+            if st.button(f"{'✓ ' if not swap else ''}{base_name} (Original-Gerät)", key=f"sw0_{key}",
+                         type="primary" if not swap else "secondary"):
+                ss.swaps.pop(key, None)
+                st.rerun()
+            for a in alts:
+                sel = swap == a["name"]
+                if st.button(f"{'✓ ' if sel else ''}{a['name']}", key=f"sw_{key}_{a['name']}",
+                             type="primary" if sel else "secondary"):
+                    ss.swaps[key] = a["name"]
+                    st.rerun()
+    st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+
+
 def workout_block(day):
     sets, reps = sets_reps(day)
     w = ai_workout(day)
@@ -783,16 +1031,14 @@ def workout_block(day):
     st.markdown("<div class='tip'>ℹ️ <b>Was bedeutet Sätze × Wiederholungen?</b> Eine <b>Wiederholung</b> ist eine "
                 "komplette Bewegung. Ein <b>Satz</b> ist eine Runde am Stück — danach 1–2 Min Pause, dann der nächste Satz.</div>",
                 unsafe_allow_html=True)
+    st.markdown("<div class='tip'>🏋️ <b>Wie viel Gewicht?</b> Die Kilo-Angaben sind gesunde <b>Startwerte</b> zum "
+                "Herantasten. Richtig ist das Gewicht, wenn sich die letzten 2 Wiederholungen anstrengend, aber "
+                "technisch sauber anfühlen — <b>nicht zu viel, nicht zu wenig</b>. Im Zweifel lieber leichter beginnen.</div>",
+                unsafe_allow_html=True)
     if overload_ready():
         st.markdown("<div class='badge'>🚀 Progressive Overload: Zeit, das Gewicht leicht zu erhöhen!</div>", unsafe_allow_html=True)
     for i, name in enumerate(ex, 1):
-        info = EXERCISES[name]
-        st.markdown(f"**{i}. {name}** · _{info['m']}_")
-        st.markdown(f"<div class='setpill'>🔁 {sets} Sätze × {reps} Wiederholungen · ⏱ ~90 Sek. Pause</div>", unsafe_allow_html=True)
-        st.video(f"https://www.youtube.com/watch?v={info['vid']}")
-        st.markdown(f"<div class='tip'>✅ <b>Einstellung:</b> {info['setup']}</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='warn'>⚠️ {info['warn']}</div>", unsafe_allow_html=True)
-        st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
+        render_exercise(day, i, name, sets, reps)
     st.markdown("<div class='tip'>📈 <b>So baust du Muskeln auf:</b> Schaffst du alle Sätze mit sauberer Technik locker, "
                 "nimm beim nächsten Mal die kleinste Gewichtsstufe mehr. Genau dieses schrittweise Steigern "
                 "(Progressive Overload) + genug Protein + Schlaf lässt den Muskel wachsen.</div>", unsafe_allow_html=True)
