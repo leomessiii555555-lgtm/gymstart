@@ -256,7 +256,7 @@ def ai_calc_calories(p, f):
         '{"kcal":Zahl,"protein":Gramm,"carbs":Gramm,"fat":Gramm,'
         '"reason":"2-3 Sätze per Du, wie du zu den Zahlen kommst"}'
     )
-    data = _openai({"model": "gpt-4o-mini", "temperature": 0.4,
+    data = _openai({"model": MODEL_CALORIES, "temperature": 0.4,
                     "response_format": {"type": "json_object"},
                     "messages": [
                         {"role": "system", "content": "Du rechnest sorgfältig und antwortest ausschließlich mit gültigem JSON."},
@@ -601,7 +601,7 @@ def ai_workout(day):
             'Antworte NUR als JSON: {"name":"kurzer Sessionname","exercises":["exakte Namen"],'
             '"focus":"Zielmuskeln heute","reason":"1-2 Sätze per Du, warum genau diese Übungen heute dran sind"}'
         )
-        data = _openai({"model": "gpt-4o-mini", "temperature": 0.5,
+        data = _openai({"model": MODEL_WORKOUT, "temperature": 0.5,
                         "response_format": {"type": "json_object"},
                         "messages": [
                             {"role": "system", "content": "Du planst sorgfältig und antwortest ausschließlich mit gültigem JSON."},
@@ -719,8 +719,16 @@ BAG_ITEMS = ["🧻 Handtuch", "💧 Wasserflasche", "👟 Sportschuhe",
 
 
 # =============================================================================
-# KI (GPT-4o-mini) — NUR Coaching-Text & Mahlzeiten, mit statischem Fallback
+# KI — je Aufgabe wählbares Modell, mit statischem Fallback ohne Key
 # =============================================================================
+# Stärkeres Modell für die "denkintensiven" Aufgaben (Übungsauswahl, Kalorien),
+# schnelles/günstiges für Text (Coaching & Mahlzeiten). Namen einfach hier ändern.
+#   Optionen z.B.: "gpt-5", "gpt-5-mini", "gpt-4o-mini", "gpt-4.1", "gpt-4.1-mini"
+MODEL_WORKOUT = "gpt-5-mini"    # Workout-Auswahl (überlegt mehr mit)
+MODEL_CALORIES = "gpt-5-mini"   # Kalorien-/Makroberechnung
+MODEL_TEXT = "gpt-4o-mini"      # Coaching-Text & Mahlzeiten
+
+
 def get_key():
     """Key robust holen: erst Session, dann Streamlit-Secrets (Cloud)."""
     k = (ss.get("api_key") or "").strip()
@@ -746,10 +754,19 @@ def key_source():
     return None
 
 
+def _is_reasoning(model):
+    """Reasoning-Modelle (gpt-5*, o1/o3/o4*) akzeptieren keine freie temperature
+    und nutzen andere Token-Parameter."""
+    return model.startswith("gpt-5") or model[:2] in ("o1", "o3", "o4")
+
+
 def _openai(payload):
     key = get_key()
     if not key:
         return None
+    # Reasoning-Modelle vertragen kein temperature != 1 -> sonst 400-Fehler.
+    if _is_reasoning(payload.get("model", "")):
+        payload.pop("temperature", None)
     req = urllib.request.Request(
         "https://api.openai.com/v1/chat/completions",
         data=json.dumps(payload).encode(),
@@ -840,7 +857,7 @@ def ai_day(day):
             "Gib JSON: {\"coaching\":\"2-3 warme, motivierende Sätze, per Du, persönlich\","
             "\"meals\":[{\"emoji\":\"🍳\",\"titel\":\"...\",\"beschreibung\":\"max 6 Wörter\","
             "\"kcal\":Zahl,\"protein\":Zahl}]}. Genau 4 Mahlzeiten, deutsche Texte.")
-        data = _openai({"model": "gpt-4o-mini", "temperature": 0.85,
+        data = _openai({"model": MODEL_TEXT, "temperature": 0.85,
                         "response_format": {"type": "json_object"},
                         "messages": [
                             {"role": "system", "content": "Du bist ein warmer Fitness-Coach für Anfänger. Antworte nur mit gültigem JSON."},
