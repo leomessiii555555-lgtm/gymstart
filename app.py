@@ -26,96 +26,127 @@ st.set_page_config(page_title="GymStart", page_icon="💪", layout="centered",
                    initial_sidebar_state="collapsed")
 
 # =============================================================================
-# STYLING – warmes helles Theme, erzwungen (auch bei Dark-Mode des Geräts)
+# STYLING – Apple-Look: klar, hell, feine Typografie, dezente Karten.
+# Alle Klassennamen bleiben identisch, damit jede Funktion weiterläuft.
 # =============================================================================
 st.markdown("""
 <style>
-  :root { color-scheme: light; }
-  html, body, .stApp { background-color:#FFF9F5 !important; }
-  .block-container { max-width:540px; padding-top:1.1rem; padding-bottom:5rem; }
+  :root {
+    color-scheme: light;
+    --bg:#f5f5f7; --surface:#ffffff; --ink:#1d1d1f; --sub:#6e6e73;
+    --line:rgba(0,0,0,.09); --accent:#FF7A1A; --accent-ink:#C2410C; --accent-soft:#FFF3EA;
+    --green:#34C759; --green-ink:#248A3D; --green-soft:#EAF9EE;
+    --red-ink:#C0392B; --red-soft:#FDF0EE;
+    --font:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
+  }
+  html, body, .stApp { background-color:var(--bg) !important; }
+  .stApp, .stApp * { font-family:var(--font); -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+  .block-container { max-width:500px; padding-top:1.2rem; padding-bottom:5rem; }
   #MainMenu, footer, header { visibility:hidden; }
 
   .stApp, .stApp p, .stApp li, .stApp label, .stApp span,
   [data-testid="stMarkdownContainer"], [data-testid="stMarkdownContainer"] p,
   [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] *,
-  .stApp h1,.stApp h2,.stApp h3,.stApp h4,.stApp h5 { color:#231A12; }
-  .stApp h1,.stApp h2,.stApp h3 { letter-spacing:-.3px; }
-  [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * { color:#8A7E73 !important; }
+  .stApp h1,.stApp h2,.stApp h3,.stApp h4,.stApp h5 { color:var(--ink); }
+  .stApp h1 { font-weight:700; letter-spacing:-.028em; font-size:2.15rem; }
+  .stApp h2 { font-weight:700; letter-spacing:-.024em; font-size:1.6rem; }
+  .stApp h3 { font-weight:600; letter-spacing:-.018em; }
+  [data-testid="stCaptionContainer"], [data-testid="stCaptionContainer"] * { color:var(--sub) !important; }
 
-  .stApp input, .stApp textarea { color:#231A12 !important; background-color:#fff !important; }
-  [data-baseweb="select"] > div { background-color:#fff !important; }
-  [data-baseweb="select"] div, [data-baseweb="popover"] li, [role="option"] { color:#231A12 !important; }
-  [data-baseweb="popover"] li, [role="option"] { background-color:#fff !important; }
+  .stApp input, .stApp textarea { color:var(--ink) !important; background-color:var(--surface) !important;
+      border-radius:12px !important; }
+  [data-baseweb="input"], [data-baseweb="base-input"] { border-radius:12px !important; }
+  [data-baseweb="select"] > div { background-color:var(--surface) !important; border-radius:12px !important; }
+  [data-baseweb="select"] div, [data-baseweb="popover"] li, [role="option"] { color:var(--ink) !important; }
+  [data-baseweb="popover"] li, [role="option"] { background-color:var(--surface) !important; }
 
-  div.stButton > button { border-radius:14px; font-weight:700; padding:.55rem 1rem;
-      background:#fff; color:#231A12 !important; border:1.5px solid #F0E7DE; width:100%; }
+  /* Buttons – Apple-Pill */
+  div.stButton > button { border-radius:980px; font-weight:600; padding:.6rem 1.1rem; font-size:15px;
+      background:var(--surface); color:var(--ink) !important; border:1px solid var(--line); width:100%;
+      transition:transform .12s ease, box-shadow .2s ease, background .2s ease; box-shadow:0 1px 2px rgba(0,0,0,.04); }
+  div.stButton > button:hover { border-color:rgba(0,0,0,.18); }
+  div.stButton > button:active { transform:scale(.985); }
   div.stButton > button[kind="primary"], div.stButton > button[kind="primary"] * {
-      background:#FF7A1A !important; color:#fff !important; border:none; }
+      background:var(--accent) !important; color:#fff !important; border:none; }
+  div.stButton > button[kind="primary"]:hover { box-shadow:0 6px 18px rgba(255,122,26,.34); }
 
-  .card { background:#fff; border:1px solid #F0E7DE; border-radius:20px;
-          padding:18px 20px; margin:12px 0; box-shadow:0 8px 24px rgba(120,80,30,.07); }
-  .card p { color:#4a3f36 !important; line-height:1.55; margin:0 0 6px; }
-  .card h3 { margin:0 0 8px; }
-  .badge { display:inline-block; background:#FFF1E6; color:#FF7A1A !important; font-weight:700;
-           font-size:12px; padding:6px 12px; border-radius:99px; }
-  .badge.green { background:#E9F9F0; color:#27AE60 !important; }
-  .kcal { font-size:46px; font-weight:800; color:#FF7A1A !important; line-height:1; }
-  .muted { color:#8A7E73 !important; }
-  .pill { display:inline-block; background:#fff5ec; color:#FF7A1A !important; font-size:12px;
-          font-weight:700; padding:5px 11px; border-radius:99px; margin:0 5px 6px 0; border:1px solid #ffe4cc; }
-  .setpill { display:inline-block; background:#FFF1E6; color:#B5541A !important; font-weight:700;
-             font-size:14px; padding:8px 13px; border-radius:12px; margin:4px 0 8px; }
-  .tip { background:#E9F9F0; border:1px solid #CDEFD9; border-radius:14px; padding:12px 15px;
-         color:#1c7a44 !important; font-size:14px; margin:10px 0; }
-  .tip b { color:#1c7a44 !important; }
-  .warn { background:#FFF3F0; border:1px solid #FFD9CF; border-radius:14px; padding:12px 15px;
-          color:#B5482E !important; font-size:14px; margin:8px 0; }
-  .warn b { color:#B5482E !important; }
-  .streak { background:linear-gradient(100deg,#FF7A1A,#FF9A4D); border-radius:18px;
-            padding:14px 20px; font-weight:800; font-size:20px; margin:6px 0 4px; }
+  /* Segmented control (horizontale Radios: Top-Nav + Sub-Navs) */
+  div[role="radiogroup"] { gap:2px !important; background:#e9e9ee; border-radius:12px; padding:3px;
+      flex-wrap:wrap; }
+  div[role="radiogroup"] > label { flex:1 1 auto; margin:0 !important; justify-content:center;
+      border-radius:9px; padding:6px 8px; transition:background .18s ease, box-shadow .18s ease; }
+  div[role="radiogroup"] > label:hover { background:rgba(255,255,255,.5); }
+  div[role="radiogroup"] > label > div:first-child { display:none !important; }
+  div[role="radiogroup"] > label p { font-size:13px; font-weight:600; color:var(--sub) !important; }
+  div[role="radiogroup"] > label:has(input:checked) { background:var(--surface);
+      box-shadow:0 1px 3px rgba(0,0,0,.12); }
+  div[role="radiogroup"] > label:has(input:checked) p { color:var(--ink) !important; }
+
+  .card { background:var(--surface); border:1px solid var(--line); border-radius:20px;
+          padding:18px 20px; margin:12px 0; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .card p { color:#3a3a3c !important; line-height:1.55; margin:0 0 6px; }
+  .card h3 { margin:0 0 10px; }
+  .badge { display:inline-block; background:var(--accent-soft); color:var(--accent-ink) !important; font-weight:600;
+           font-size:12px; letter-spacing:.02em; padding:6px 13px; border-radius:980px; }
+  .badge.green { background:var(--green-soft); color:var(--green-ink) !important; }
+  .kcal { font-size:52px; font-weight:700; color:var(--ink) !important; line-height:1; letter-spacing:-.03em; }
+  .muted { color:var(--sub) !important; }
+  .pill { display:inline-block; background:#f2f2f4; color:#3a3a3c !important; font-size:12px;
+          font-weight:600; padding:6px 12px; border-radius:980px; margin:0 5px 6px 0; border:1px solid var(--line); }
+  .setpill { display:inline-block; background:var(--accent-soft); color:var(--accent-ink) !important; font-weight:600;
+             font-size:14px; padding:8px 14px; border-radius:980px; margin:4px 0 8px; }
+  .tip { background:var(--green-soft); border:1px solid rgba(52,199,89,.22); border-radius:14px; padding:12px 15px;
+         color:var(--green-ink) !important; font-size:14px; line-height:1.5; margin:10px 0; }
+  .tip b { color:var(--green-ink) !important; }
+  .warn { background:var(--red-soft); border:1px solid rgba(192,57,43,.18); border-radius:14px; padding:12px 15px;
+          color:var(--red-ink) !important; font-size:14px; line-height:1.5; margin:8px 0; }
+  .warn b { color:var(--red-ink) !important; }
+  .streak { background:linear-gradient(120deg,#FF7A1A,#FF9F45); border-radius:18px;
+            padding:14px 20px; font-weight:700; font-size:19px; margin:6px 0 4px;
+            box-shadow:0 8px 22px rgba(255,122,26,.24); }
   .streak, .streak * { color:#fff !important; }
-  .meal { display:flex; gap:12px; align-items:center; padding:11px 13px; background:#fff8f2;
-          border-radius:14px; margin:8px 0; }
-  .meal .mi { font-size:24px; } .meal .mt { font-weight:700; font-size:14px; color:#231A12 !important; }
-  .meal .md { font-size:12px; color:#8A7E73 !important; }
-  .meal .mk { margin-left:auto; text-align:right; font-size:12px; font-weight:700; color:#FF7A1A !important; }
-  .step { display:flex; gap:12px; margin-bottom:10px; align-items:flex-start; }
-  .step .num { min-width:26px; height:26px; border-radius:50%; background:#FFF1E6; color:#FF7A1A !important;
-               font-weight:800; font-size:13px; display:flex; align-items:center; justify-content:center; }
-  .wkrow { display:flex; gap:14px; align-items:center; padding:12px; border-radius:14px;
-           margin-bottom:8px; background:#fff8f2; border:1px solid #F0E7DE; }
-  .wkrow.train { background:#FFF1E6; border-color:#ffe0c7; }
-  .wkday { width:46px; height:46px; border-radius:12px; background:#fff; display:flex; align-items:center;
-           justify-content:center; font-weight:800; border:1px solid #F0E7DE; color:#231A12 !important; }
-  .wkrow.train .wkday { background:#FF7A1A; color:#fff !important; border-color:#FF7A1A; }
-  .wktitle { font-weight:700; font-size:14.5px; color:#231A12 !important; }
-  .wkfocus { font-size:12.5px; color:#8A7E73 !important; }
+  .meal { display:flex; gap:12px; align-items:center; padding:12px 14px; background:#fafafc;
+          border:1px solid var(--line); border-radius:14px; margin:8px 0; }
+  .meal .mi { font-size:24px; } .meal .mt { font-weight:600; font-size:14px; color:var(--ink) !important; }
+  .meal .md { font-size:12px; color:var(--sub) !important; }
+  .meal .mk { margin-left:auto; text-align:right; font-size:12px; font-weight:600; color:var(--accent-ink) !important; }
+  .step { display:flex; gap:12px; margin-bottom:11px; align-items:flex-start; }
+  .step .num { min-width:26px; height:26px; border-radius:50%; background:var(--accent-soft); color:var(--accent-ink) !important;
+               font-weight:700; font-size:13px; display:flex; align-items:center; justify-content:center; }
+  .wkrow { display:flex; gap:14px; align-items:center; padding:12px; border-radius:16px;
+           margin-bottom:8px; background:#fafafc; border:1px solid var(--line); }
+  .wkrow.train { background:var(--accent-soft); border-color:rgba(255,122,26,.2); }
+  .wkday { width:46px; height:46px; border-radius:13px; background:var(--surface); display:flex; align-items:center;
+           justify-content:center; font-weight:700; border:1px solid var(--line); color:var(--ink) !important; }
+  .wkrow.train .wkday { background:var(--accent); color:#fff !important; border-color:var(--accent); }
+  .wktitle { font-weight:600; font-size:14.5px; color:var(--ink) !important; }
+  .wkfocus { font-size:12.5px; color:var(--sub) !important; }
   .dots { display:flex; gap:6px; flex-wrap:wrap; margin:4px 0 2px; }
   .dot { width:30px; height:30px; border-radius:50%; display:flex; align-items:center; justify-content:center;
-         font-size:12px; font-weight:800; background:#fff; border:2px solid #F0E7DE; color:#8A7E73 !important; }
-  .dot.done { background:#27AE60; border-color:#27AE60; color:#fff !important; }
-  .dot.today { background:#FF7A1A; border-color:#FF7A1A; color:#fff !important; box-shadow:0 0 0 4px #FFF1E6; }
-  .stat { background:#fff; border:1px solid #F0E7DE; border-radius:16px; padding:14px 6px; text-align:center;
-          box-shadow:0 6px 16px rgba(120,80,30,.05); }
-  .stat .v { font-size:26px; font-weight:800; color:#231A12; line-height:1; }
-  .stat .l { font-size:11px; color:#8A7E73; margin-top:4px; }
-  .mile { display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:14px; margin-bottom:8px; font-weight:600; }
-  .mile.on { background:#E9F9F0; color:#1c7a44; border:1px solid #CDEFD9; }
-  .mile.off { background:#faf6f1; color:#a89a8c; border:1px solid #F0E7DE; }
+         font-size:12px; font-weight:700; background:var(--surface); border:1.5px solid var(--line); color:var(--sub) !important; }
+  .dot.done { background:var(--green); border-color:var(--green); color:#fff !important; }
+  .dot.today { background:var(--accent); border-color:var(--accent); color:#fff !important; box-shadow:0 0 0 4px var(--accent-soft); }
+  .stat { background:var(--surface); border:1px solid var(--line); border-radius:16px; padding:16px 6px; text-align:center;
+          box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .stat .v { font-size:28px; font-weight:700; color:var(--ink); line-height:1; letter-spacing:-.02em; }
+  .stat .l { font-size:11px; color:var(--sub); margin-top:5px; }
+  .mile { display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:14px; margin-bottom:8px; font-weight:500; }
+  .mile.on { background:var(--green-soft); color:var(--green-ink); border:1px solid rgba(52,199,89,.22); }
+  .mile.off { background:#f2f2f4; color:#a1a1a6; border:1px solid var(--line); }
   .knav { display:flex; gap:8px; margin-bottom:6px; }
-  .gcard { background:#fff; border:1px solid #F0E7DE; border-radius:20px; overflow:hidden;
-           margin:12px 0; box-shadow:0 8px 24px rgba(120,80,30,.07); }
+  .gcard { background:var(--surface); border:1px solid var(--line); border-radius:20px; overflow:hidden;
+           margin:12px 0; box-shadow:0 1px 3px rgba(0,0,0,.05); }
   .gcard img { width:100%; display:block; aspect-ratio:16/9; object-fit:cover; }
   .gcard .gbody { padding:14px 18px 16px; }
-  .gcard .gname { font-weight:800; font-size:17px; color:#231A12; }
-  .gcard .gmus { display:inline-block; background:#FFF1E6; color:#FF7A1A !important; font-weight:700;
-                 font-size:11px; padding:3px 10px; border-radius:99px; margin-left:6px; }
-  .supp { display:flex; gap:12px; align-items:flex-start; padding:13px 15px; border-radius:14px; margin-bottom:8px; border:1px solid #F0E7DE; }
-  .supp .se { font-size:22px; } .supp .st { font-weight:700; color:#231A12; }
-  .supp .sd { font-size:13px; color:#6b6055; }
-  .supp.good { background:#E9F9F0; border-color:#CDEFD9; }
+  .gcard .gname { font-weight:600; font-size:17px; color:var(--ink); letter-spacing:-.01em; }
+  .gcard .gmus { display:inline-block; background:var(--accent-soft); color:var(--accent-ink) !important; font-weight:600;
+                 font-size:11px; padding:3px 10px; border-radius:980px; margin-left:6px; }
+  .supp { display:flex; gap:12px; align-items:flex-start; padding:13px 15px; border-radius:14px; margin-bottom:8px; border:1px solid var(--line); }
+  .supp .se { font-size:22px; } .supp .st { font-weight:600; color:var(--ink); }
+  .supp .sd { font-size:13px; color:var(--sub); }
+  .supp.good { background:var(--green-soft); border-color:rgba(52,199,89,.22); }
   .supp.mid { background:#FFF8E9; border-color:#F3E6C4; }
-  .supp.bad { background:#FBF0EE; border-color:#F0DBD5; }
+  .supp.bad { background:var(--red-soft); border-color:rgba(192,57,43,.16); }
 </style>
 """, unsafe_allow_html=True)
 
@@ -136,6 +167,7 @@ def init_state():
     d.setdefault("checklist", {})
     d.setdefault("feedback", {})       # day -> "zu leicht"/"passt"/"zu schwer"
     d.setdefault("ai_cache", {})       # day -> {"coaching":..,"meals":[..]}
+    d.setdefault("ai_workout", {})     # day -> {"name","exercises","focus","reason"}
     d.setdefault("day_offset", 0)
     d.setdefault("premium", False)
     d.setdefault("view", "Heute")
@@ -362,6 +394,67 @@ def exercises_for(day):
     return [n for n in SESSIONS[session_for(day)] if n in EXERCISES]
 
 
+def workout_exercises(day):
+    """Übungen eines (auch vergangenen) Tages — KI-Wahl wenn vorhanden, sonst regelbasiert."""
+    w = ss.get("ai_workout", {}).get(day)
+    if w and w.get("exercises"):
+        return [e for e in w["exercises"] if e in EXERCISES]
+    return exercises_for(day)
+
+
+def recent_sessions(day, n=4):
+    """Muskelgruppen der letzten Trainingseinheiten (neueste zuerst) — für Balance."""
+    out = []
+    for d in range(day - 1, 3, -1):
+        if is_training_day(d):
+            muscles = list(dict.fromkeys(EXERCISES[e]["m"] for e in workout_exercises(d)))
+            out.append(muscles)
+            if len(out) >= n:
+                break
+    return out
+
+
+def ai_workout(day):
+    """Wählt das heutige Workout adaptiv: KI prüft Stand & zuletzt trainierte Muskeln."""
+    cache = ss.setdefault("ai_workout", {})
+    if day in cache:
+        return cache[day]
+    default = {"name": session_for(day), "exercises": exercises_for(day), "focus": "", "reason": ""}
+    if get_key():
+        p = ss.profile
+        tnum = training_day_number(day)
+        hist = recent_sessions(day)
+        hist_txt = " | ".join(", ".join(m) for m in hist) if hist else "noch keine"
+        avail = "; ".join(f"{k} ({v['m']})" for k, v in EXERCISES.items())
+        prompt = (
+            "Du bist ein erfahrener Kraft- und Reha-Coach. Plane das heutige Workout durchdacht.\n"
+            f"Person: {p['exp']}, Ziel {p['goal']}, trainiert {p['days']}× pro Woche, heute Trainingseinheit Nr. {tnum}.\n"
+            f"Letzte Einheiten (Muskelgruppen, neueste zuerst): {hist_txt}.\n"
+            "Überlege wie ein Profi: In welcher Phase steht die Person? Welche Muskelgruppen wurden "
+            "zuletzt vernachlässigt und sind heute dran (ausgewogene Erholung, jede Gruppe regelmäßig)? "
+            "Wähle 4–5 Übungen AUSSCHLIESSLICH aus dieser Liste (exakte Namen verwenden):\n"
+            f"{avail}\n"
+            'Antworte NUR als JSON: {"name":"kurzer Sessionname","exercises":["exakte Namen"],'
+            '"focus":"Zielmuskeln heute","reason":"1-2 Sätze per Du, warum genau diese Übungen heute dran sind"}'
+        )
+        data = _openai({"model": "gpt-4o-mini", "temperature": 0.5,
+                        "response_format": {"type": "json_object"},
+                        "messages": [
+                            {"role": "system", "content": "Du planst sorgfältig und antwortest ausschließlich mit gültigem JSON."},
+                            {"role": "user", "content": prompt}]})
+        if data:
+            try:
+                r = json.loads(data["choices"][0]["message"]["content"])
+                ex = [e for e in r.get("exercises", []) if e in EXERCISES]
+                if 3 <= len(ex) <= 6:
+                    default = {"name": r.get("name") or session_for(day), "exercises": ex,
+                               "focus": r.get("focus", ""), "reason": r.get("reason", "")}
+            except Exception:
+                pass
+    cache[day] = default
+    return default
+
+
 def sets_reps(day):
     n = training_day_number(day)
     sets = 2 if n <= 3 else 3
@@ -537,102 +630,12 @@ def streak():
     return best
 
 
-GYMS = [
-    dict(id="g1", n="FitBox Discount", dist=0.6, price=19, rating=4.1, lat=48.208, lon=16.363,
-         feat=["Geräte", "Cardio", "24/7"], hours="24/7"),
-    dict(id="g2", n="PowerHouse Gym", dist=1.2, price=35, rating=4.6, lat=48.216, lon=16.379,
-         feat=["Freie Gewichte", "Kurse", "Sauna", "Trainer"], hours="6–23 Uhr"),
-    dict(id="g3", n="Vital Club Premium", dist=2.1, price=59, rating=4.8, lat=48.198, lon=16.352,
-         feat=["Sauna", "Pool", "Personal Trainer", "Kurse"], hours="7–22 Uhr"),
-    dict(id="g4", n="CityFit Basic", dist=0.9, price=25, rating=4.0, lat=48.221, lon=16.371,
-         feat=["Geräte", "Cardio", "Kurse"], hours="6–23 Uhr"),
-]
-
-
-def budget_max():
-    return {"Bis 20 €": 20, "20–40 €": 40, "40 €+": 999}.get(ss.profile["budget"], 40)
-
-
-def ranked_gyms():
-    goal = ss.profile["goal"]
-    bmax = budget_max()
-    scored = []
-    for g in GYMS:
-        s = g["rating"] * 10 - g["dist"] * 4 + (25 if g["price"] <= bmax else -30)
-        if goal == "Muskeln aufbauen" and "Freie Gewichte" in g["feat"]:
-            s += 15
-        if goal == "Abnehmen" and "Kurse" in g["feat"]:
-            s += 10
-        scored.append((s, g))
-    scored.sort(key=lambda x: -x[0])
-    return [g for _, g in scored]
-
-
 def card(html):
     st.markdown(f"<div class='card'>{html}</div>", unsafe_allow_html=True)
 
 
 # =============================================================================
-# ECHTE GYMS via OpenStreetMap (kostenlos, kein API-Key)
-# =============================================================================
-def _http_get_json(url, ua=False):
-    headers = {"User-Agent": "GymStart/1.0 (fitness beginner app)"} if ua else {}
-    req = urllib.request.Request(url, headers=headers)
-    with urllib.request.urlopen(req, timeout=25) as r:
-        return json.loads(r.read())
-
-
-def _haversine(lat1, lon1, lat2, lon2):
-    r = 6371.0
-    p1, p2 = math.radians(lat1), math.radians(lat2)
-    dphi, dl = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
-    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
-    return 2 * r * math.asin(math.sqrt(a))
-
-
-def find_real_gyms(city):
-    """Sucht echte Fitnessstudios in der Nähe eines Orts (OpenStreetMap)."""
-    key = city.strip().lower()
-    cache = ss.setdefault("gym_cache", {})
-    if key in cache:
-        return cache[key]
-    q = urllib.parse.quote
-    try:
-        geo = _http_get_json(
-            f"https://nominatim.openstreetmap.org/search?q={q(city)}&format=json&limit=1", ua=True)
-        if not geo:
-            cache[key] = None
-            return None
-        lat, lon = float(geo[0]["lat"]), float(geo[0]["lon"])
-        oq = (f'[out:json][timeout:25];('
-              f'nwr["leisure"="fitness_centre"](around:8000,{lat},{lon});'
-              f'nwr["sport"="fitness"](around:8000,{lat},{lon});'
-              f'nwr["leisure"="sports_centre"]["fitness_centre"="yes"](around:8000,{lat},{lon});'
-              f');out center 150;')
-        data = _http_get_json("https://overpass-api.de/api/interpreter?data=" + q(oq), ua=True)
-        gyms, seen = [], set()
-        for el in data.get("elements", []):
-            tags = el.get("tags", {})
-            name = tags.get("name")
-            glat = el.get("lat") or el.get("center", {}).get("lat")
-            glon = el.get("lon") or el.get("center", {}).get("lon")
-            if not name or name in seen or glat is None:
-                continue
-            seen.add(name)
-            gyms.append(dict(n=name, lat=glat, lon=glon,
-                             dist=round(_haversine(lat, lon, glat, glon), 1),
-                             hours=tags.get("opening_hours", ""),
-                             website=tags.get("website", "") or tags.get("contact:website", "")))
-        gyms.sort(key=lambda g: g["dist"])
-        cache[key] = dict(center=(lat, lon), gyms=gyms[:20])
-        return cache[key]
-    except Exception:
-        cache[key] = None
-        return None
-
-
-# =============================================================================
-# ONBOARDING / RESULT / GYM / COMMIT
+# ONBOARDING / RESULT / TRAININGSTAGE / COMMIT
 # =============================================================================
 def view_onboarding():
     st.markdown("# Gym<span style='color:#FF7A1A'>Start</span>", unsafe_allow_html=True)
@@ -652,18 +655,8 @@ def view_onboarding():
                              index=["Muskeln aufbauen", "Abnehmen", "Fitter werden", "Allgemeine Gesundheit"].index(p["goal"]))
     p["exp"] = st.selectbox("Gym-Erfahrung", ["Noch nie im Gym", "Kurz reingeschaut", "Leichte Erfahrung"],
                             index=["Noch nie im Gym", "Kurz reingeschaut", "Leichte Erfahrung"].index(p["exp"]))
-    default_wd = [WD[i] for i in p.get("train_days", [0, 2, 4]) if 0 <= i < 7]
-    chosen = st.multiselect("An welchen Tagen willst du ins Gym?", WD, default=default_wd,
-                            help="Wähle 2–5 Tage. Danach richtet sich dein Wochenplan.")
-    p["train_days"] = sorted(WD.index(x) for x in chosen)
-    p["days"] = max(1, len(p["train_days"]))
-    p["budget"] = st.selectbox("Budget fürs Gym", ["Bis 20 €", "20–40 €", "40 €+"],
-                               index=["Bis 20 €", "20–40 €", "40 €+"].index(p["budget"]))
     st.divider()
-    enough = len(p["train_days"]) >= 2
-    if not enough:
-        st.warning("Bitte wähle mindestens 2 Trainingstage.")
-    if st.button("Plan berechnen ✨", type="primary", disabled=not enough):
+    if st.button("Plan berechnen ✨", type="primary"):
         if not ss.weight_log:
             ss.weight_log = [(datetime.date.today().isoformat(), p["weight"])]
         ss.pop("plan", None)
@@ -690,71 +683,51 @@ def view_result():
     card(f"<h3>🏋️ Dein Trainingsplan</h3><b>{plan_name(p)}</b><br>"
          f"<span class='pill'>{p['days']}× / Woche</span><span class='pill'>Start: Maschinen</span>"
          f"<span class='pill'>Progressive Overload</span>")
-    if st.button("Passendes Gym finden →", type="primary"):
-        ss.phase = "gym"
+    if st.button("Weiter →", type="primary"):
+        ss.phase = "days"
         st.rerun()
 
 
-def view_gym():
-    st.markdown("## Finde dein Gym")
-    st.caption("Gib deine Stadt oder PLZ ein — wir suchen echte Fitnessstudios in deiner Nähe.")
-    city = st.text_input("Stadt oder PLZ", value=ss.get("gym_city", "Wien"), key="gym_city_in")
-    if st.button("🔍 Studios suchen", type="primary"):
-        ss.gym_city = city
-        ss.pop("gym", None)
-        st.rerun()
+def days_editor(key):
+    """Wochentag-Auswahl (wiederverwendbar). Gibt True zurück, wenn gültig (≥2)."""
+    p = ss.profile
+    default_wd = [WD[i] for i in p.get("train_days", [0, 2, 4]) if 0 <= i < 7]
+    chosen = st.multiselect("An welchen Tagen willst du ins Gym?", WD, default=default_wd, key=key)
+    idx = sorted(WD.index(x) for x in chosen)
+    if len(idx) >= 2:
+        if idx != p.get("train_days"):
+            p["train_days"] = idx
+            p["days"] = len(idx)
+            ss.pop("plan", None)
+        return True
+    st.warning("Bitte wähle mindestens 2 Trainingstage.")
+    return False
 
-    if not ss.get("gym_city"):
-        return
-    with st.spinner("Suche echte Studios in deiner Nähe …"):
-        result = find_real_gyms(ss.gym_city)
 
-    if result is None:
-        st.info("Ich konnte gerade keine Studios laden. Prüfe die Schreibweise des Orts "
-                "oder versuch es gleich nochmal.")
-        return
-    if not result["gyms"]:
-        st.warning("Für diesen Ort sind in OpenStreetMap keine Studios eingetragen. "
-                   "Versuch eine (größere) Stadt in der Nähe.")
-        return
-
-    try:
-        import pandas as pd
-        st.map(pd.DataFrame([{"lat": g["lat"], "lon": g["lon"]} for g in result["gyms"]]))
-    except Exception:
-        pass
-
-    flt = st.text_input("Nach Name filtern (z. B. Fitinn, McFit …)", key="gym_filter").strip().lower()
-    gyms = [g for g in result["gyms"] if flt in g["n"].lower()] if flt else result["gyms"]
-    if not gyms:
-        st.caption("Kein Studio mit diesem Namen in der Nähe gefunden. Lösch den Filter, um alle zu sehen.")
-    else:
-        st.caption(f"{len(gyms)} Studios · nach Entfernung sortiert.")
-    for i, g in enumerate(gyms):
-        rec = "<div class='badge green' style='margin-top:8px'>✅ Am nächsten zu dir</div>" if i == 0 else ""
-        extra = f"<br><span class='muted' style='font-size:12px'>🕒 {g['hours']}</span>" if g["hours"] else ""
-        web = f" · <a href='{g['website']}' target='_blank'>Website</a>" if g["website"] else ""
-        card(f"<b style='font-size:16px'>{g['n']}</b><br>"
-             f"<span class='muted' style='font-size:13px'>📍 {g['dist']} km entfernt{web}</span>{extra}{rec}")
-        sel = ss.get("gym") == g["n"]
-        if st.button(("✓ Ausgewählt" if sel else "Dieses Gym wählen"),
-                     key=f"gym_{i}", type=("primary" if sel else "secondary")):
-            ss.gym = g["n"]
-            st.rerun()
-
+def view_days():
+    st.markdown("## Deine Trainingstage")
+    st.caption("An welchen Wochentagen willst du trainieren? Danach richtet sich dein ganzer Wochenplan — "
+               "und die Übungen passen sich an, je nachdem was du zuletzt trainiert hast.")
+    ok = days_editor("days_pick")
+    if ok:
+        m = plan()
+        st.markdown(f"<div class='tip'>👍 <b>{ss.profile['days']}× pro Woche.</b> Dein Tagesziel: "
+                    f"<b>{m['kcal']} kcal</b> · {m['protein']} g Protein.</div>", unsafe_allow_html=True)
     st.divider()
-    if st.button("Weiter →", type="primary", disabled=not ss.get("gym")):
+    if st.button("Weiter →", type="primary", disabled=not ok):
         ss.phase = "commit"
         st.rerun()
 
 
 def view_commit():
+    p = ss.profile
+    tage = ", ".join(WD[i] for i in p.get("train_days", []))
     st.markdown("<div style='text-align:center;margin-top:26px;font-size:60px'>🔥</div>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align:center'>Du bist bereit.</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center'>Deine Journey beginnt <b>heute</b>. Kein Druck — ein Tag nach dem anderen.</p>", unsafe_allow_html=True)
-    card(f"<span class='muted' style='font-size:13px'>Dein Gym</span><br><b style='font-size:16px'>{ss.get('gym') or ''}</b>"
+    card(f"<span class='muted' style='font-size:13px'>Deine Trainingstage</span><br><b style='font-size:16px'>{tage}</b>"
          f"<br><span class='muted' style='font-size:13px'>Die ersten 14 Tage sind komplett kostenlos.</span>")
-    if st.button("Gym-Journey starten 🚀", type="primary"):
+    if st.button("Journey starten 🚀", type="primary"):
         ss.phase = "journey"
         ss.start_date = datetime.date.today()
         st.rerun()
@@ -799,11 +772,13 @@ def render_meals(m, meals):
 
 def workout_block(day):
     sets, reps = sets_reps(day)
-    session = session_for(day)
-    ex = exercises_for(day)
-    muscles = " · ".join(dict.fromkeys(EXERCISES[n]["m"] for n in ex))
-    st.markdown(f"### 🏋️ {session}")
-    st.markdown(f"<div class='badge'>Heute: {muscles}</div>", unsafe_allow_html=True)
+    w = ai_workout(day)
+    ex = [e for e in w["exercises"] if e in EXERCISES] or exercises_for(day)
+    focus = w.get("focus") or " · ".join(dict.fromkeys(EXERCISES[n]["m"] for n in ex))
+    st.markdown(f"### 🏋️ {w['name']}")
+    st.markdown(f"<div class='badge'>Heute: {focus}</div>", unsafe_allow_html=True)
+    if w.get("reason"):
+        st.markdown(f"<div class='tip'>🤖 <b>Warum heute diese Übungen:</b> {w['reason']}</div>", unsafe_allow_html=True)
     st.caption("Aufwärmen: 5 Min lockeres Cardio, dann bei jeder Übung 1 leichter Aufwärmsatz.")
     st.markdown("<div class='tip'>ℹ️ <b>Was bedeutet Sätze × Wiederholungen?</b> Eine <b>Wiederholung</b> ist eine "
                 "komplette Bewegung. Ein <b>Satz</b> ist eine Runde am Stück — danach 1–2 Min Pause, dann der nächste Satz.</div>",
@@ -893,15 +868,24 @@ def view_today():
     missed_banner(day)
 
     m = plan()
-    ai = ai_day(day)
     training = is_training_day(day)
+    need = get_key() and (day not in ss.ai_cache or (training and day not in ss.ai_workout))
+    if need:
+        with st.spinner("🤖 Dein Coach stellt deinen Tag zusammen …"):
+            ai = ai_day(day)
+            if training:
+                ai_workout(day)
+    else:
+        ai = ai_day(day)
+        if training:
+            ai_workout(day)
 
     # Titel je nach Tag
     titles = {1: "Mentale Vorbereitung", 2: "Ernährungs-Setup", 3: "Erster Gymbesuch", 4: "Erste echte Übungen"}
     if day in titles:
         title = titles[day]
     elif training:
-        title = f"Trainingstag · {session_for(day)}"
+        title = f"Trainingstag · {ai_workout(day)['name']}"
     else:
         title = "Ruhetag & Erholung"
     st.markdown(f"## {title}")
@@ -982,18 +966,7 @@ def view_week():
     sess = plan_sessions()
     st.markdown("## 🗓 Dein Wochenplan")
     st.caption(f"{plan_name(p)} · {len(td)}× pro Woche · deine gewählten Tage. "
-               f"Einheiten rotieren: {' · '.join(sess)}.")
-    with st.expander("🗓 Trainingstage ändern"):
-        new_td = st.multiselect("An welchen Tagen willst du ins Gym?", WD,
-                                default=[WD[i] for i in td], key="wk_td")
-        if st.button("Speichern", key="wk_save", disabled=len(new_td) < 2):
-            p["train_days"] = sorted(WD.index(x) for x in new_td)
-            p["days"] = max(1, len(p["train_days"]))
-            ss.pop("plan", None)
-            st.toast("Wochenplan aktualisiert.")
-            st.rerun()
-        if len(new_td) < 2:
-            st.caption("Mindestens 2 Tage wählen.")
+               "Trainingstage änderst du im Menü ⚙️.")
     ti = 0
     for i, tag in enumerate(WD):
         if i in td:
@@ -1135,11 +1108,9 @@ def view_progress():
 
 def view_settings():
     st.markdown("## ⚙️ Menü & Einstellungen")
-    st.markdown("### 🎯 Dein Gym")
-    st.write(ss.get("gym") or "—")
-    if st.button("Anderes Gym wählen"):
-        ss.phase = "gym"
-        st.rerun()
+    st.markdown("### 🗓 Deine Trainingstage")
+    st.caption("Ändere jederzeit, an welchen Tagen du trainierst — der Wochenplan passt sich an.")
+    days_editor("settings_days")
 
     st.divider()
     st.markdown("### ⏱ Journey (Demo-Steuerung)")
@@ -1168,5 +1139,5 @@ def view_journey():
 # =============================================================================
 # ROUTER
 # =============================================================================
-{"onboarding": view_onboarding, "result": view_result, "gym": view_gym,
+{"onboarding": view_onboarding, "result": view_result, "days": view_days,
  "commit": view_commit, "journey": view_journey}[ss.phase]()
