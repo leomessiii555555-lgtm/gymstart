@@ -56,6 +56,8 @@ st.markdown("""
   .stApp input, .stApp textarea { color:var(--ink) !important; background-color:var(--surface) !important;
       border-radius:12px !important; }
   [data-baseweb="input"], [data-baseweb="base-input"] { border-radius:12px !important; }
+  /* Zahlenfelder: reine Eingabe, KEINE Hoch/Runter-Pfeile */
+  [data-testid="stNumberInputStepUp"], [data-testid="stNumberInputStepDown"] { display:none !important; }
   [data-baseweb="select"] > div { background-color:var(--surface) !important; border-radius:12px !important; }
   [data-baseweb="select"] div, [data-baseweb="popover"] li, [role="option"] { color:var(--ink) !important; }
   [data-baseweb="popover"] li, [role="option"] { background-color:var(--surface) !important; }
@@ -760,15 +762,52 @@ def _openai(payload):
         return None
 
 
-def static_meals(m):
-    d = [.28, .12, .35, .25]
-    base = [("🥣", "Haferflocken + Skyr + Beeren", "Proteinreicher Start"),
-            ("🥜", "Nüsse + Apfel", "Schneller Snack"),
-            ("🍗", "Hähnchen/Tofu, Reis & Gemüse", "Klassiker fürs Ziel"),
-            ("🐟", "Lachs/Tofu + Kartoffeln", "Protein + gute Fette")]
-    return [dict(emoji=e, titel=t, beschreibung=b,
-                 kcal=round(m["kcal"] * d[i]), protein=round(m["protein"] * d[i]))
-            for i, (e, t, b) in enumerate(base)]
+# Mahlzeiten-Pool je Slot – rotiert pro Tag, damit nicht immer dasselbe erscheint.
+MEAL_DIST = [.28, .12, .35, .25]
+MEAL_POOL = [
+    [  # Frühstück
+        ("🥣", "Haferflocken + Skyr + Beeren", "Proteinreicher Start"),
+        ("🍳", "Rührei mit Vollkornbrot", "Herzhaft & sättigend"),
+        ("🥛", "Magerquark mit Banane & Honig", "Cremig, viel Protein"),
+        ("🥐", "Porridge mit Nüssen & Apfel", "Warm & energiereich"),
+        ("🍌", "Protein-Smoothie (Banane, Hafer, Milch)", "Schnell für unterwegs"),
+        ("🧇", "Vollkorn-Pancakes mit Quark", "Sattmacher am Morgen"),
+    ],
+    [  # Snack
+        ("🥜", "Nüsse + Apfel", "Schneller Snack"),
+        ("🍌", "Banane + Handvoll Mandeln", "Energie-Kick"),
+        ("🧀", "Käsewürfel + Vollkorncracker", "Herzhafter Snack"),
+        ("🥕", "Gemüsesticks + Hummus", "Leicht & knackig"),
+        ("🍏", "Skyr + Beeren", "Proteinreicher Snack"),
+        ("🥚", "2 gekochte Eier", "Purer Protein-Snack"),
+    ],
+    [  # Mittagessen
+        ("🍗", "Hähnchen/Tofu, Reis & Gemüse", "Klassiker fürs Ziel"),
+        ("🍝", "Vollkornnudeln, Hack-Tomatensauce", "Sättigend & einfach"),
+        ("🌯", "Wrap mit Pute/Tofu & Salat", "Schnell & handlich"),
+        ("🍚", "Bowl: Reis, Bohnen, Avocado", "Pflanzlich & satt"),
+        ("🥔", "Kartoffeln mit Magerquark & Kräutern", "Einfach & proteinreich"),
+        ("🍲", "Chili sin/con Carne", "Warm & eiweißreich"),
+    ],
+    [  # Abendessen
+        ("🐟", "Lachs/Tofu + Kartoffeln", "Protein + gute Fette"),
+        ("🥗", "Großer Salat mit Ei & Thunfisch", "Leicht am Abend"),
+        ("🍲", "Gemüsepfanne mit Hähnchen/Tempeh", "Warm & bunt"),
+        ("🍳", "Omelett mit Gemüse", "Schnell & leicht"),
+        ("🫘", "Linsen-Curry mit Reis", "Pflanzlich & herzhaft"),
+        ("🥩", "Steak/Halloumi mit Ofengemüse", "Deftig & proteinreich"),
+    ],
+]
+
+
+def static_meals(m, day=1):
+    out = []
+    for i, pool in enumerate(MEAL_POOL):
+        e, t, b = pool[(day + i) % len(pool)]   # +i: Slots rotieren versetzt
+        out.append(dict(emoji=e, titel=t, beschreibung=b,
+                        kcal=round(m["kcal"] * MEAL_DIST[i]),
+                        protein=round(m["protein"] * MEAL_DIST[i])))
+    return out
 
 
 def static_coaching(day):
@@ -788,7 +827,7 @@ def ai_day(day):
     if day in ss.ai_cache:
         return ss.ai_cache[day]
     p, m = ss.profile, plan()
-    result = {"coaching": static_coaching(day), "meals": static_meals(m), "ai": False}
+    result = {"coaching": static_coaching(day), "meals": static_meals(m, day), "ai": False}
     if get_key():
         goal = p["goal"]
         prompt = (
@@ -796,6 +835,8 @@ def ai_day(day):
             f"Körpertyp {p['bodytype']}, Ziel {goal}, Erfahrung {p['exp']}, Streak {streak()} Tage, "
             f"heute Journey-Tag {day}. Tagesziel exakt: {m['kcal']} kcal, {m['protein']}g Protein, "
             f"{m['carbs']}g Carbs, {m['fat']}g Fett (VERWENDE GENAU DIESE ZAHLEN).\n"
+            "Variiere die Gerichte von Tag zu Tag – wiederhole nicht ständig dieselben Mahlzeiten, "
+            "biete abwechslungsreiche, alltagstaugliche Ideen.\n"
             "Gib JSON: {\"coaching\":\"2-3 warme, motivierende Sätze, per Du, persönlich\","
             "\"meals\":[{\"emoji\":\"🍳\",\"titel\":\"...\",\"beschreibung\":\"max 6 Wörter\","
             "\"kcal\":Zahl,\"protein\":Zahl}]}. Genau 4 Mahlzeiten, deutsche Texte.")
@@ -847,10 +888,13 @@ def view_onboarding():
     st.markdown("#### Erzähl uns von dir")
     st.caption("Damit wir alles exakt für dich berechnen — jeder erlebt eine andere App.")
     p = ss.profile
-    p["weight"] = st.slider("Gewicht (kg)", 35, 250, int(p["weight"]))
-    p["height"] = st.slider("Größe (cm)", 130, 220, int(p["height"]))
-    p["age"] = st.slider("Alter", 14, 90, int(p["age"]))
-    p["sex"] = st.selectbox("Geschlecht", ["Männlich", "Weiblich", "Divers"],
+    st.caption("Tippe deine Werte einfach ein.")
+    c1, c2 = st.columns(2)
+    p["weight"] = c1.number_input("Gewicht (kg)", 35, 250, int(p["weight"]))
+    p["height"] = c2.number_input("Größe (cm)", 130, 220, int(p["height"]))
+    c3, c4 = st.columns(2)
+    p["age"] = c3.number_input("Alter", 14, 90, int(p["age"]))
+    p["sex"] = c4.selectbox("Geschlecht", ["Männlich", "Weiblich", "Divers"],
                             index=["Männlich", "Weiblich", "Divers"].index(p["sex"]))
     p["bodytype"] = st.selectbox("Körpertyp", ["Sehr dünn", "Normal", "Übergewichtig"],
                                  index=["Sehr dünn", "Normal", "Übergewichtig"].index(p["bodytype"]))
@@ -949,15 +993,21 @@ def view_commit():
 # =============================================================================
 # JOURNEY – Menü + Tagesinhalt
 # =============================================================================
+NAV_LABELS = ["📅 Heute", "🗓 Woche", "📚 Wissen", "📊 Fortschritt", "⚙️ Menü"]
+NAV_VIEWS = ["Heute", "Woche", "Wissen", "Fortschritt", "Menü"]
+
+
 def top_nav():
     st.markdown("### Gym<span style='color:#FF7A1A'>Start</span>", unsafe_allow_html=True)
-    labels = ["📅 Heute", "🗓 Woche", "📚 Wissen", "📊 Fortschritt", "⚙️ Menü"]
-    views = ["Heute", "Woche", "Wissen", "Fortschritt", "Menü"]
-    if ss.view not in views:
-        ss.view = "Heute"
-    choice = st.radio("nav", labels, index=views.index(ss.view),
-                      horizontal=True, label_visibility="collapsed")
-    ss.view = views[labels.index(choice)]
+    # Programmatischen Ansichtswechsel (z.B. via goto_today) VOR dem Radio anwenden,
+    # damit Navigations-Markierung und Inhalt immer synchron sind.
+    pending = ss.pop("pending_view", None)
+    if pending in NAV_VIEWS:
+        ss.nav_choice = NAV_LABELS[NAV_VIEWS.index(pending)]
+    if ss.get("nav_choice") not in NAV_LABELS:
+        ss.nav_choice = NAV_LABELS[NAV_VIEWS.index(ss.get("view", "Heute"))]
+    st.radio("nav", NAV_LABELS, key="nav_choice", horizontal=True, label_visibility="collapsed")
+    ss.view = NAV_VIEWS[NAV_LABELS.index(ss.nav_choice)]
     st.markdown("<div style='height:2px'></div>", unsafe_allow_html=True)
 
 
@@ -1313,7 +1363,7 @@ def view_progress():
     elif sub == "⚖️ Gewicht":
         st.caption("Miss dich alle 1–2 Wochen. Die App passt deine Kalorien automatisch an.")
         c1, c2 = st.columns([2, 1])
-        nw = c1.slider("Aktuelles Gewicht (kg)", 35, 250, int(ss.profile["weight"]), key="nw")
+        nw = c1.number_input("Aktuelles Gewicht (kg)", 35, 250, int(ss.profile["weight"]), key="nw")
         if c2.button("Speichern", key="save_w"):
             ss.profile["weight"] = nw
             ss.weight_log.append((datetime.date.today().isoformat(), nw))
@@ -1369,6 +1419,20 @@ def view_progress():
             st.markdown(f"- **{x['name']}** · {x['protein']} g P · {x['kcal']} kcal")
 
 
+def goto_today():
+    """Zum aktuellen Tag springen und Inhalte (bei API-Key) VOR dem Neurendern
+    laden – so erscheint direkt die fertige Heute-Seite statt der alten Menü-UI.
+    Ansichtswechsel via pending_view (top_nav wendet es vor dem Radio an)."""
+    ss.pending_view = "Heute"
+    d = current_day()
+    if get_key():
+        with st.spinner("🤖 Dein Coach stellt deinen Tag zusammen …"):
+            ai_day(d)
+            if is_training_day(d):
+                ai_workout(d)
+    st.rerun()
+
+
 def view_settings():
     st.markdown("## ⚙️ Menü & Einstellungen")
     st.markdown("### 🗓 Deine Trainingstage")
@@ -1381,10 +1445,10 @@ def view_settings():
     c1, c2 = st.columns(2)
     if c1.button("⏭ Nächster Tag"):
         ss.day_offset += 1
-        st.rerun()
+        goto_today()
     if c2.button("⏮ Vorheriger Tag", disabled=ss.day_offset <= 0):
         ss.day_offset = max(0, ss.day_offset - 1)
-        st.rerun()
+        goto_today()
 
     st.divider()
     if st.button("🔁 App komplett zurücksetzen"):
