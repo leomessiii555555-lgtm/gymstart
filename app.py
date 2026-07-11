@@ -16,11 +16,18 @@ Day-by-Day Journey für absolute Anfänger, wie im Konzept:
 """
 import json
 import math
+import base64
 import datetime
 import urllib.request
 import urllib.error
 import urllib.parse
 import streamlit as st
+
+try:
+    from streamlit_oauth import OAuth2Component
+    OAUTH_AVAILABLE = True
+except Exception:
+    OAUTH_AVAILABLE = False
 
 st.set_page_config(page_title="GymStart", page_icon="💪", layout="centered",
                    initial_sidebar_state="collapsed")
@@ -1643,7 +1650,9 @@ def view_settings():
         if ss.get("_db_error"):
             st.caption(f"⚠️ {ss['_db_error']}")
         if st.button("Abmelden"):
-            st.logout()
+            for k in ("_user_email", "_user_name", "_token", "_loaded", "_last_saved"):
+                ss.pop(k, None)
+            st.rerun()
 
     st.divider()
     if st.button("🔁 App komplett zurücksetzen"):
@@ -1673,9 +1682,18 @@ PERSIST_KEYS = ["phase", "profile", "start_date", "completed", "checklist",
 INT_KEY_DICTS = ["feedback", "workout_wish", "checklist"]
 
 
-def auth_configured():
+GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_REVOKE_URL = "https://oauth2.googleapis.com/revoke"
+
+
+def oauth_configured():
+    """Google-Login (Popup via streamlit-oauth) nur aktiv, wenn Paket + Secrets da."""
+    if not OAUTH_AVAILABLE:
+        return False
     try:
-        return bool(st.secrets.get("auth", {}).get("client_id")) and hasattr(st, "login")
+        a = st.secrets.get("auth", {})
+        return bool(a.get("client_id") and a.get("client_secret") and a.get("redirect_uri"))
     except Exception:
         return False
 
@@ -1689,14 +1707,16 @@ def supabase_cfg():
         return None
 
 
-def current_user():
+def _decode_id_token(id_token):
+    """E-Mail & Name aus dem Google id_token (JWT) lesen — ohne Signaturprüfung
+    (Token kam direkt von Google über TLS via die OAuth-Komponente)."""
     try:
-        u = getattr(st, "user", None)
-        if u is not None and getattr(u, "is_logged_in", False):
-            return (u.email or "").lower(), (getattr(u, "name", "") or u.email or "")
+        payload = id_token.split(".")[1]
+        payload += "=" * (-len(payload) % 4)
+        d = json.loads(base64.urlsafe_b64decode(payload.encode()))
+        return (d.get("email") or "").lower(), (d.get("name") or d.get("email") or "")
     except Exception:
-        pass
-    return None, None
+        return None, None
 
 
 def _serialize():
@@ -1778,23 +1798,41 @@ def save_profile(email):
 
 
 def auth_gate():
-    """Login-Screen zeigen und bei erstem Login den gespeicherten Stand laden."""
-    if not auth_configured():
+    """Login-Screen mit Google-Popup (streamlit-oauth) + Laden des Stands bei Login."""
+    if not oauth_configured():
         return
-    email, name = current_user()
-    if not email:
-        st.markdown("# Gym<span style='color:#FF7A1A'>Start</span>", unsafe_allow_html=True)
-        st.markdown("### Willkommen 👋")
-        st.markdown("<p>Melde dich mit Google an — so bleiben dein aktueller Tag, deine Erfolge "
-                    "und dein Plan auf jedem Gerät gespeichert.</p>", unsafe_allow_html=True)
-        if st.button("Mit Google anmelden", type="primary"):
-            st.login()
-        st.stop()
-    ss["_user_email"] = email
-    ss["_user_name"] = name
-    if not ss.get("_loaded"):
-        load_profile(email)
-        ss["_loaded"] = True
+    # Bereits in dieser Sitzung eingeloggt?
+    if ss.get("_user_email"):
+        if not ss.get("_loaded"):
+            load_profile(ss["_user_email"])
+            ss["_loaded"] = True
+        return
+    # Login-Screen
+    a = st.secrets["auth"]
+    st.markdown("# Gym<span style='color:#FF7A1A'>Start</span>", unsafe_allow_html=True)
+    st.markdown("### Willkommen 👋")
+    st.markdown("<p>Melde dich mit Google an — so bleiben dein aktueller Tag, deine Erfolge "
+                "und dein Plan auf jedem Gerät gespeichert. Es öffnet sich ein kleines Google-Fenster.</p>",
+                unsafe_allow_html=True)
+    oauth2 = OAuth2Component(a["client_id"], a["client_secret"], GOOGLE_AUTH_URL,
+                             GOOGLE_TOKEN_URL, GOOGLE_TOKEN_URL, GOOGLE_REVOKE_URL)
+    result = oauth2.authorize_button(
+        name="Mit Google anmelden",
+        redirect_uri=a["redirect_uri"],
+        scope="openid email profile",
+        key="google_login",
+        extras_params={"prompt": "select_account"},
+    )
+    if result and "token" in result:
+        email, name = _decode_id_token(result["token"].get("id_token", ""))
+        if email:
+            ss["_user_email"] = email
+            ss["_user_name"] = name
+            ss["_loaded"] = False
+            st.rerun()
+        else:
+            st.error("Anmeldung ok, aber keine E-Mail erhalten. Ist der Scope email/openid freigegeben?")
+    st.stop()
 
 
 def persist_if_changed():

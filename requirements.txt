@@ -1,5 +1,5 @@
-streamlit==1.42.0
+streamlit==1.40.0
 pandas==2.2.3
 numpy==1.26.4
 pyarrow==17.0.0
-Authlib==1.6.5
+streamlit-oauth==0.1.14
