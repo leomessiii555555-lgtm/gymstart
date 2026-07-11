@@ -763,6 +763,7 @@ def _is_reasoning(model):
 def _openai(payload):
     key = get_key()
     if not key:
+        ss["_last_ai_error"] = "Kein API-Key gefunden."
         return None
     # Reasoning-Modelle vertragen kein temperature != 1 -> sonst 400-Fehler.
     if _is_reasoning(payload.get("model", "")):
@@ -773,9 +774,18 @@ def _openai(payload):
         headers={"Content-Type": "application/json", "Authorization": "Bearer " + key},
         method="POST")
     try:
-        with urllib.request.urlopen(req, timeout=45) as r:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            ss["_last_ai_error"] = ""
             return json.loads(r.read())
-    except Exception:
+    except urllib.error.HTTPError as e:
+        try:
+            body = e.read().decode()
+        except Exception:
+            body = ""
+        ss["_last_ai_error"] = f"HTTP {e.code} bei „{payload.get('model','?')}“: {body[:400]}"
+        return None
+    except Exception as e:
+        ss["_last_ai_error"] = f"{type(e).__name__}: {e}"
         return None
 
 
@@ -1455,6 +1465,27 @@ def view_settings():
     st.markdown("### 🗓 Deine Trainingstage")
     st.caption("Ändere jederzeit, an welchen Tagen du trainierst — der Wochenplan passt sich an.")
     days_editor("settings_days")
+
+    st.divider()
+    st.markdown("### 🤖 KI-Coach")
+    src = key_source()
+    st.caption(f"Workout & Kalorien: **{MODEL_WORKOUT}** · Texte: **{MODEL_TEXT}** · "
+               f"Key: {src or 'KEINER gefunden'}")
+    if st.button("KI-Modell jetzt testen"):
+        with st.spinner(f"Teste {MODEL_WORKOUT} …"):
+            r = _openai({"model": MODEL_WORKOUT,
+                         "response_format": {"type": "json_object"},
+                         "messages": [{"role": "user",
+                                       "content": "Antworte nur mit diesem JSON: {\"ok\":true}"}]})
+        if r and "choices" in r:
+            st.success(f"✅ {MODEL_WORKOUT} funktioniert! Dein Coach rechnet mit KI.")
+        else:
+            st.error(f"❌ {MODEL_WORKOUT} antwortet nicht — die App nutzt daher die "
+                     "Formel/Regel-Berechnung. Fehlermeldung von OpenAI:")
+            st.code(ss.get("_last_ai_error") or "Unbekannt (kein Key?)")
+            st.caption("Häufigste Ursache: Dein OpenAI-Konto hat noch keinen Zugriff auf dieses "
+                       "Modell. Dann in app.py oben `MODEL_WORKOUT`/`MODEL_CALORIES` auf ein "
+                       "freigeschaltetes Modell setzen (z.B. \"gpt-4o-mini\" oder \"gpt-4.1-mini\").")
 
     st.divider()
     st.markdown("### ⏱ Journey (Demo-Steuerung)")
