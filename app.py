@@ -15,9 +15,11 @@ Day-by-Day Journey für absolute Anfänger, wie im Konzept:
 - Statischer Content ohne API; GPT-4o-mini NUR für Coaching-Text & Mahlzeiten.
 """
 import json
+import math
 import datetime
 import urllib.request
 import urllib.error
+import urllib.parse
 import streamlit as st
 
 st.set_page_config(page_title="GymStart", page_icon="💪", layout="centered",
@@ -182,6 +184,60 @@ def macros(p):
     pr, ca, fa = macro_split(p)
     return dict(kcal=kcal, protein=round(kcal * pr / 4),
                 carbs=round(kcal * ca / 4), fat=round(kcal * fa / 9))
+
+
+def plan():
+    """Aktive Tagesziele (kcal/Makros). KI-berechnet wenn Key da, sonst Formel.
+    Wird einmal berechnet und in ss.plan gecacht (bis Gewicht sich ändert)."""
+    if ss.get("plan"):
+        return ss["plan"]
+    ss["plan"] = compute_plan()
+    return ss["plan"]
+
+
+def compute_plan():
+    p = ss.profile
+    f = macros(p)  # Formel als Anker & Fallback
+    if get_key():
+        ai = ai_calc_calories(p, f)
+        if ai:
+            return ai
+    f["reason"] = (f"Grundumsatz {bmr(p)} kcal × Aktivität ({p['days']} Trainingstage) "
+                   f"= {tdee(p)} kcal Gesamtbedarf → Ziel {f['kcal']} kcal für „{p['goal']}“.")
+    f["ai"] = False
+    return f
+
+
+def ai_calc_calories(p, f):
+    prompt = (
+        "Du bist Ernährungswissenschaftler. Berechne den täglichen Kalorien- und Makrobedarf "
+        f"für diese Person und gehe dabei sorgfältig vor:\n"
+        f"- {p['age']} Jahre, {p['sex']}, {p['weight']} kg, {p['height']} cm\n"
+        f"- Körpertyp {p['bodytype']}, Ziel: {p['goal']}, {p['days']}× Training/Woche, Erfahrung: {p['exp']}\n"
+        "Denke wie ein Profi: Grundumsatz (Mifflin-St Jeor), passender Aktivitätsfaktor, "
+        "sinnvolle Ziel-Anpassung (Defizit/Überschuss) und eine für Ziel & Körpertyp passende "
+        "Makroverteilung. Antworte NUR als JSON: "
+        '{"kcal":Zahl,"protein":Gramm,"carbs":Gramm,"fat":Gramm,'
+        '"reason":"2-3 Sätze per Du, wie du zu den Zahlen kommst"}'
+    )
+    data = _openai({"model": "gpt-4o-mini", "temperature": 0.4,
+                    "response_format": {"type": "json_object"},
+                    "messages": [
+                        {"role": "system", "content": "Du rechnest sorgfältig und antwortest ausschließlich mit gültigem JSON."},
+                        {"role": "user", "content": prompt}]})
+    if not data:
+        return None
+    try:
+        r = json.loads(data["choices"][0]["message"]["content"])
+        kcal, pro = int(round(r["kcal"])), int(round(r["protein"]))
+        car, fat = int(round(r["carbs"])), int(round(r["fat"]))
+        # Plausibilitäts-Check — bei Unsinn lieber die Formel
+        if not (1000 <= kcal <= 5000 and 30 <= pro <= 400 and 0 <= car <= 700 and 0 <= fat <= 250):
+            return None
+        return dict(kcal=kcal, protein=pro, carbs=car, fat=fat,
+                    reason=r.get("reason", ""), ai=True)
+    except Exception:
+        return None
 
 
 def plan_name(p):
@@ -384,7 +440,7 @@ def ai_day(day):
     """Gibt {coaching, meals} zurück – KI wenn Key da, sonst statisch."""
     if day in ss.ai_cache:
         return ss.ai_cache[day]
-    p, m = ss.profile, macros(ss.profile)
+    p, m = ss.profile, plan()
     result = {"coaching": static_coaching(day), "meals": static_meals(m), "ai": False}
     if get_key():
         goal = p["goal"]
@@ -468,6 +524,63 @@ def card(html):
 
 
 # =============================================================================
+# ECHTE GYMS via OpenStreetMap (kostenlos, kein API-Key)
+# =============================================================================
+def _http_get_json(url, ua=False):
+    headers = {"User-Agent": "GymStart/1.0 (fitness beginner app)"} if ua else {}
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=25) as r:
+        return json.loads(r.read())
+
+
+def _haversine(lat1, lon1, lat2, lon2):
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dphi, dl = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def find_real_gyms(city):
+    """Sucht echte Fitnessstudios in der Nähe eines Orts (OpenStreetMap)."""
+    key = city.strip().lower()
+    cache = ss.setdefault("gym_cache", {})
+    if key in cache:
+        return cache[key]
+    q = urllib.parse.quote
+    try:
+        geo = _http_get_json(
+            f"https://nominatim.openstreetmap.org/search?q={q(city)}&format=json&limit=1", ua=True)
+        if not geo:
+            cache[key] = None
+            return None
+        lat, lon = float(geo[0]["lat"]), float(geo[0]["lon"])
+        oq = (f'[out:json][timeout:25];('
+              f'node["leisure"="fitness_centre"](around:6000,{lat},{lon});'
+              f'way["leisure"="fitness_centre"](around:6000,{lat},{lon}););out center 50;')
+        data = _http_get_json("https://overpass-api.de/api/interpreter?data=" + q(oq), ua=True)
+        gyms, seen = [], set()
+        for el in data.get("elements", []):
+            tags = el.get("tags", {})
+            name = tags.get("name")
+            glat = el.get("lat") or el.get("center", {}).get("lat")
+            glon = el.get("lon") or el.get("center", {}).get("lon")
+            if not name or name in seen or glat is None:
+                continue
+            seen.add(name)
+            gyms.append(dict(n=name, lat=glat, lon=glon,
+                             dist=round(_haversine(lat, lon, glat, glon), 1),
+                             hours=tags.get("opening_hours", ""),
+                             website=tags.get("website", "") or tags.get("contact:website", "")))
+        gyms.sort(key=lambda g: g["dist"])
+        cache[key] = dict(center=(lat, lon), gyms=gyms[:8])
+        return cache[key]
+    except Exception:
+        cache[key] = None
+        return None
+
+
+# =============================================================================
 # ONBOARDING / RESULT / GYM / COMMIT
 # =============================================================================
 def view_onboarding():
@@ -500,58 +613,82 @@ def view_onboarding():
 
 
 def view_result():
-    p, m = ss.profile, macros(ss.profile)
+    p = ss.profile
+    with st.spinner("🤖 Dein Coach berechnet deinen Bedarf …"):
+        m = plan()
     st.markdown("<div class='badge'>🎯 Auf dich zugeschnitten</div>", unsafe_allow_html=True)
     st.markdown("## Dein Plan steht.")
+    src = "🤖 Von deinem KI-Coach berechnet" if m.get("ai") else "📐 Berechnet (Mifflin-St Jeor)"
     card(f"<div style='text-align:center'><div class='muted' style='letter-spacing:1px;font-size:12px'>DEIN TAGESZIEL</div>"
          f"<div class='kcal'>{m['kcal']}</div><div class='muted'>kcal / Tag · {p['goal']}</div>"
          f"<div style='display:flex;justify-content:space-around;margin-top:16px'>"
          f"<div><div style='font-weight:800;color:#27AE60'>{m['protein']}g</div><div class='muted' style='font-size:11px'>PROTEIN</div></div>"
          f"<div><div style='font-weight:800;color:#FF7A1A'>{m['carbs']}g</div><div class='muted' style='font-size:11px'>CARBS</div></div>"
-         f"<div><div style='font-weight:800;color:#C79A2E'>{m['fat']}g</div><div class='muted' style='font-size:11px'>FETT</div></div></div></div>")
+         f"<div><div style='font-weight:800;color:#C79A2E'>{m['fat']}g</div><div class='muted' style='font-size:11px'>FETT</div></div></div>"
+         f"<div class='muted' style='font-size:11px;margin-top:12px'>{src}</div></div>")
+    if m.get("reason"):
+        st.markdown(f"<div class='tip'>💡 <b>So hat dein Coach gerechnet:</b> {m['reason']}</div>", unsafe_allow_html=True)
     card(f"<h3>🏋️ Dein Trainingsplan</h3><b>{plan_name(p)}</b><br>"
          f"<span class='pill'>{p['days']}× / Woche</span><span class='pill'>Start: Maschinen</span>"
          f"<span class='pill'>Progressive Overload</span>")
-    st.caption(f"So berechnet: Grundumsatz {bmr(p)} kcal × Aktivität ({p['days']} Tage) = {tdee(p)} kcal → Ziel {m['kcal']} kcal.")
     if st.button("Passendes Gym finden →", type="primary"):
         ss.phase = "gym"
         st.rerun()
 
 
 def view_gym():
-    st.markdown("## Wähle dein Gym")
-    st.caption(f"Empfehlung nach Ziel & Budget (bis {ss.profile['budget']}).")
+    st.markdown("## Finde dein Gym")
+    st.caption("Gib deine Stadt oder PLZ ein — wir suchen echte Fitnessstudios in deiner Nähe.")
+    city = st.text_input("Stadt oder PLZ", value=ss.get("gym_city", "Wien"), key="gym_city_in")
+    if st.button("🔍 Studios suchen", type="primary"):
+        ss.gym_city = city
+        ss.pop("gym", None)
+        st.rerun()
+
+    if not ss.get("gym_city"):
+        return
+    with st.spinner("Suche echte Studios in deiner Nähe …"):
+        result = find_real_gyms(ss.gym_city)
+
+    if result is None:
+        st.info("Ich konnte gerade keine Studios laden. Prüfe die Schreibweise des Orts "
+                "oder versuch es gleich nochmal.")
+        return
+    if not result["gyms"]:
+        st.warning("Für diesen Ort sind in OpenStreetMap keine Studios eingetragen. "
+                   "Versuch eine (größere) Stadt in der Nähe.")
+        return
+
     try:
         import pandas as pd
-        st.map(pd.DataFrame([{"lat": g["lat"], "lon": g["lon"]} for g in GYMS]), zoom=12)
+        st.map(pd.DataFrame([{"lat": g["lat"], "lon": g["lon"]} for g in result["gyms"]]))
     except Exception:
         pass
-    gyms = ranked_gyms()
-    best = gyms[0]["id"]
-    for g in gyms:
-        rec = "<div class='badge green' style='margin-top:8px'>✅ Für dein Ziel & Budget am besten</div>" if g["id"] == best else ""
-        card(f"<div style='display:flex;justify-content:space-between'>"
-             f"<div><b style='font-size:16px'>{g['n']}</b><br><span class='muted' style='font-size:13px'>"
-             f"{g['dist']} km · {'⭐'*round(g['rating'])} {g['rating']} · {g['hours']}</span></div>"
-             f"<div style='font-weight:800;color:#FF7A1A;text-align:right'>{g['price']} €<br>"
-             f"<span class='muted' style='font-size:11px;font-weight:400'>/Monat</span></div></div>"
-             f"<div style='margin-top:8px'>{''.join(f'<span class=pill>{f}</span>' for f in g['feat'])}</div>{rec}")
-        if st.button(("✓ Ausgewählt" if ss.gym == g["id"] else "Dieses Gym wählen"),
-                     key="gym_" + g["id"], type=("primary" if ss.gym == g["id"] else "secondary")):
-            ss.gym = g["id"]
+
+    st.caption(f"{len(result['gyms'])} echte Studios gefunden · nach Entfernung sortiert.")
+    for i, g in enumerate(result["gyms"]):
+        rec = "<div class='badge green' style='margin-top:8px'>✅ Am nächsten zu dir</div>" if i == 0 else ""
+        extra = f"<br><span class='muted' style='font-size:12px'>🕒 {g['hours']}</span>" if g["hours"] else ""
+        web = f" · <a href='{g['website']}' target='_blank'>Website</a>" if g["website"] else ""
+        card(f"<b style='font-size:16px'>{g['n']}</b><br>"
+             f"<span class='muted' style='font-size:13px'>📍 {g['dist']} km entfernt{web}</span>{extra}{rec}")
+        sel = ss.get("gym") == g["n"]
+        if st.button(("✓ Ausgewählt" if sel else "Dieses Gym wählen"),
+                     key=f"gym_{i}", type=("primary" if sel else "secondary")):
+            ss.gym = g["n"]
             st.rerun()
+
     st.divider()
-    if st.button("Weiter →", type="primary", disabled=not ss.gym):
+    if st.button("Weiter →", type="primary", disabled=not ss.get("gym")):
         ss.phase = "commit"
         st.rerun()
 
 
 def view_commit():
-    gym = next((g for g in GYMS if g["id"] == ss.gym), None)
     st.markdown("<div style='text-align:center;margin-top:26px;font-size:60px'>🔥</div>", unsafe_allow_html=True)
     st.markdown("<h2 style='text-align:center'>Du bist bereit.</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align:center'>Deine Journey beginnt <b>heute</b>. Kein Druck — ein Tag nach dem anderen.</p>", unsafe_allow_html=True)
-    card(f"<span class='muted' style='font-size:13px'>Dein Gym</span><br><b style='font-size:16px'>{gym['n'] if gym else ''}</b>"
+    card(f"<span class='muted' style='font-size:13px'>Dein Gym</span><br><b style='font-size:16px'>{ss.get('gym') or ''}</b>"
          f"<br><span class='muted' style='font-size:13px'>Die ersten 14 Tage sind komplett kostenlos.</span>")
     if st.button("Gym-Journey starten 🚀", type="primary"):
         ss.phase = "journey"
@@ -684,7 +821,7 @@ def view_today():
         st.markdown(f"<div class='streak'>🔥 {streak()} Tage Streak</div>", unsafe_allow_html=True)
     missed_banner(day)
 
-    m = macros(ss.profile)
+    m = plan()
     ai = ai_day(day)
     training = is_training_day(day)
 
@@ -711,7 +848,8 @@ def view_today():
         card(html)
         card(f"<h3>🍽️ Deine erste Kalorien-Info</h3><p>Ab heute isst du <b style='color:#FF7A1A'>{m['kcal']} kcal</b> "
              "pro Tag. Details kommen morgen — heute reicht: damit starten.</p>")
-        checklist_block()
+        st.markdown("<div class='tip'>📅 <b>Dein Fahrplan:</b> Morgen die Ernährung, an Tag 3 dein erster Gymbesuch. "
+                    "Wir bereiten dich Schritt für Schritt vor.</div>", unsafe_allow_html=True)
 
     elif day == 2:
         card(f"<h3>📊 Deine Makros — einfach erklärt</h3>"
@@ -721,7 +859,9 @@ def view_today():
             f"<span class='pill'>{x}</span>" for x in ["Haferflocken", "Skyr", "Eier", "Hähnchen/Tofu", "Reis",
                                                        "Kartoffeln", "TK-Gemüse", "Beeren", "Nüsse", "Olivenöl"]))
         render_meals(m, ai["meals"])
-        st.markdown("<div class='tip'>🎯 <b>Für morgen:</b> Nimm dir vor, tatsächlich ins Gym zu gehen — nur schauen. Tasche bereitlegen.</div>", unsafe_allow_html=True)
+        st.markdown("<div class='tip'>🎯 <b>Morgen ist dein erster Gymbesuch!</b> Pack heute schon deine Tasche, "
+                    "damit du entspannt loslegen kannst.</div>", unsafe_allow_html=True)
+        checklist_block()
 
     elif day == 3:
         html = "<h3>👣 Dein erster Besuch — Schritt für Schritt</h3>"
@@ -860,7 +1000,9 @@ def view_progress():
         if c2.button("Speichern", key="save_w"):
             ss.profile["weight"] = nw
             ss.weight_log.append((datetime.date.today().isoformat(), nw))
-            st.toast(f"Gespeichert — neues Ziel: {macros(ss.profile)['kcal']} kcal/Tag")
+            ss.pop("plan", None)      # Kalorien neu berechnen lassen
+            ss.ai_cache.clear()       # Coaching/Mahlzeiten an neue Zahlen anpassen
+            st.toast(f"Gespeichert — neues Ziel: {plan()['kcal']} kcal/Tag")
             st.rerun()
         if len(ss.weight_log) >= 2:
             try:
@@ -890,7 +1032,7 @@ def view_progress():
         st.caption("Logge, was du heute isst — sieh, wie viel Protein noch fehlt.")
         today = datetime.date.today().isoformat()
         log = ss.food_log.setdefault(today, [])
-        m = macros(ss.profile)
+        m = plan()
         got_p = sum(x["protein"] for x in log)
         got_k = sum(x["kcal"] for x in log)
         pct = min(100, round(got_p / m["protein"] * 100)) if m["protein"] else 0
@@ -913,8 +1055,10 @@ def view_progress():
 def view_settings():
     st.markdown("## ⚙️ Menü & Einstellungen")
     st.markdown("### 🎯 Dein Gym")
-    gym = next((g for g in GYMS if g["id"] == ss.gym), None)
-    st.write(gym["n"] if gym else "—")
+    st.write(ss.get("gym") or "—")
+    if st.button("Anderes Gym wählen"):
+        ss.phase = "gym"
+        st.rerun()
 
     st.divider()
     st.markdown("### ⏱ Journey (Demo-Steuerung)")
