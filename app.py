@@ -93,6 +93,27 @@ st.markdown("""
          font-size:12px; font-weight:800; background:#fff; border:2px solid #F0E7DE; color:#8A7E73 !important; }
   .dot.done { background:#27AE60; border-color:#27AE60; color:#fff !important; }
   .dot.today { background:#FF7A1A; border-color:#FF7A1A; color:#fff !important; box-shadow:0 0 0 4px #FFF1E6; }
+  .stat { background:#fff; border:1px solid #F0E7DE; border-radius:16px; padding:14px 6px; text-align:center;
+          box-shadow:0 6px 16px rgba(120,80,30,.05); }
+  .stat .v { font-size:26px; font-weight:800; color:#231A12; line-height:1; }
+  .stat .l { font-size:11px; color:#8A7E73; margin-top:4px; }
+  .mile { display:flex; align-items:center; gap:10px; padding:11px 14px; border-radius:14px; margin-bottom:8px; font-weight:600; }
+  .mile.on { background:#E9F9F0; color:#1c7a44; border:1px solid #CDEFD9; }
+  .mile.off { background:#faf6f1; color:#a89a8c; border:1px solid #F0E7DE; }
+  .knav { display:flex; gap:8px; margin-bottom:6px; }
+  .gcard { background:#fff; border:1px solid #F0E7DE; border-radius:20px; overflow:hidden;
+           margin:12px 0; box-shadow:0 8px 24px rgba(120,80,30,.07); }
+  .gcard img { width:100%; display:block; aspect-ratio:16/9; object-fit:cover; }
+  .gcard .gbody { padding:14px 18px 16px; }
+  .gcard .gname { font-weight:800; font-size:17px; color:#231A12; }
+  .gcard .gmus { display:inline-block; background:#FFF1E6; color:#FF7A1A !important; font-weight:700;
+                 font-size:11px; padding:3px 10px; border-radius:99px; margin-left:6px; }
+  .supp { display:flex; gap:12px; align-items:flex-start; padding:13px 15px; border-radius:14px; margin-bottom:8px; border:1px solid #F0E7DE; }
+  .supp .se { font-size:22px; } .supp .st { font-weight:700; color:#231A12; }
+  .supp .sd { font-size:13px; color:#6b6055; }
+  .supp.good { background:#E9F9F0; border-color:#CDEFD9; }
+  .supp.mid { background:#FFF8E9; border-color:#F3E6C4; }
+  .supp.bad { background:#FBF0EE; border-color:#F0DBD5; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -178,27 +199,35 @@ def plan_name(p):
 # =============================================================================
 EXERCISES = {
     "Beinpresse": dict(m="Beine & Po", vid="dIhx9s2akVo",
+                       desc="Du drückst im Sitzen eine Platte mit den Füßen weg — trainiert Oberschenkel und Po, ganz ohne Belastung für den Rücken.",
                        setup="Rückenlehne aufrecht, Füße schulterbreit auf der Platte.",
                        warn="Knie in Richtung Zehen bewegen — nie nach innen kippen und nicht ganz durchdrücken."),
     "Brustpresse (Maschine)": dict(m="Brust & Trizeps", vid="vfWqWby1PZ0",
+                       desc="Du drückst zwei Griffe von der Brust weg — baut Brust, Schultern und Trizeps auf.",
                        setup="Griffe auf Höhe der mittleren Brust einstellen.",
                        warn="Rücken bleibt an der Lehne, kein Hohlkreuz."),
     "Latzug (Kabelzug)": dict(m="Rücken & Bizeps", vid="x4fHENgCi6o",
+                       desc="Du ziehst eine Stange von oben zur Brust — formt den breiten, kräftigen Rücken.",
                        setup="Beinpolster fixieren, Stange etwas weiter als schulterbreit greifen.",
                        warn="Zur oberen Brust ziehen, nicht in den Nacken. Kein Reißen."),
     "Rudern (Maschine)": dict(m="Oberer Rücken", vid="qPiF6y_HOBs",
+                       desc="Du ziehst Griffe zum Körper — stärkt den oberen Rücken und verbessert die Haltung.",
                        setup="Brust ans Polster, Sitzhöhe so, dass Griffe auf Bauchhöhe sind.",
                        warn="Rücken gerade halten, Schulterblätter zusammenziehen."),
     "Schulterpresse (Maschine)": dict(m="Schultern", vid="3b3xodJR75U",
+                       desc="Du drückst Griffe über den Kopf — formt runde, kräftige Schultern.",
                        setup="Griffe starten auf Schulterhöhe.",
                        warn="Nicht bis zum Anschlag durchdrücken."),
     "Beinbeuger": dict(m="Beinrückseite", vid="1aJCM5ewSv8",
+                       desc="Du beugst die Beine gegen Widerstand — trainiert die oft vernachlässigte Beinrückseite.",
                        setup="Polster knapp über der Ferse, Drehachse auf Kniehöhe.",
                        warn="Langsam und ohne Schwung beugen und strecken."),
     "Beinstrecker": dict(m="Beinvorderseite", vid="fIyf6iLZn5U",
+                       desc="Du streckst die Beine gegen Widerstand — kräftigt die Oberschenkelvorderseite.",
                        setup="Kniegelenk auf Drehachse, Polster über den Fußgelenken.",
                        warn="Oben kurz halten, kontrolliert ablassen — kein Schwung."),
     "Bauchmaschine": dict(m="Bauch", vid="k3bF5LQAjB4",
+                       desc="Du rollst den Oberkörper gegen Widerstand ein — kräftigt gezielt die Bauchmuskeln.",
                        setup="Griffe fassen, Brustpolster an der Brust.",
                        warn="Aus dem Bauch einrollen, nicht am Nacken ziehen."),
 }
@@ -762,103 +791,127 @@ def view_week():
 
 def view_knowledge():
     st.markdown("## 📚 Wissen")
-    with st.expander("📜 Gym-Etikette — die ungeschriebenen Regeln", expanded=True):
+    sub = st.radio("wsub", ["📜 Etikette", "🏋️ Geräte", "💊 Supplements", "🛌 Regeneration"],
+                   horizontal=True, label_visibility="collapsed", key="know_sub")
+
+    if sub == "📜 Etikette":
+        st.caption("Die ungeschriebenen Regeln — damit du dich vom ersten Tag an sicher fühlst.")
         for e, t, d in ETIKETTE:
-            st.markdown(f"**{e} {t}** — {d}")
-    with st.expander("🏋️ Geräte-Orientierung"):
-        st.caption("Die wichtigsten Anfänger-Maschinen, wofür sie sind und worauf du achtest.")
+            card(f"<b style='font-size:15.5px'>{e} {t}</b><br><span class='muted'>{d}</span>")
+
+    elif sub == "🏋️ Geräte":
+        st.caption("Die wichtigsten Anfänger-Maschinen — mit Foto, wofür sie sind und worauf du achtest.")
         for name, info in EXERCISES.items():
-            st.markdown(f"**{name}** · _{info['m']}_")
-            st.markdown(f"<div class='tip'>✅ {info['setup']}</div>", unsafe_allow_html=True)
-            st.markdown(f"<div class='warn'>⚠️ {info['warn']}</div>", unsafe_allow_html=True)
-    with st.expander("💊 Supplement-Guide für Anfänger"):
+            st.markdown(
+                f"<div class='gcard'>"
+                f"<img src='https://img.youtube.com/vi/{info['vid']}/hqdefault.jpg' alt='{name}'>"
+                f"<div class='gbody'>"
+                f"<div class='gname'>{name}<span class='gmus'>{info['m']}</span></div>"
+                f"<p style='margin:8px 0 0;color:#4a3f36'>{info['desc']}</p>"
+                f"<div class='tip'>🔧 <b>So stellst du es ein:</b> {info['setup']}</div>"
+                f"<div class='warn'>⚠️ <b>Achte darauf:</b> {info['warn']}</div>"
+                f"</div></div>", unsafe_allow_html=True)
+
+    elif sub == "💊 Supplements":
+        st.caption("Was wirklich sinnvoll ist — und was du dir sparen kannst.")
+        cls = {"✅": "good", "🟡": "mid", "❌": "bad"}
         for e, t, d in SUPPLEMENTS:
-            st.markdown(f"**{e} {t}** — {d}")
-    with st.expander("🛌 Regeneration & Erholung"):
+            st.markdown(f"<div class='supp {cls.get(e, 'good')}'><span class='se'>{e}</span>"
+                        f"<div><div class='st'>{t}</div><div class='sd'>{d}</div></div></div>",
+                        unsafe_allow_html=True)
+
+    else:
+        st.caption("Erholung ist Teil des Trainings — hier steckt der eigentliche Fortschritt.")
         for e, t, d in REGEN:
-            st.markdown(f"**{e} {t}** — {d}")
+            card(f"<b style='font-size:15.5px'>{e} {t}</b><br><span class='muted'>{d}</span>")
+
+
+def stat_tile(col, emoji, value, label):
+    col.markdown(f"<div class='stat'><div class='v'>{emoji} {value}</div><div class='l'>{label}</div></div>",
+                 unsafe_allow_html=True)
 
 
 def view_progress():
     st.markdown("## 📊 Dein Fortschritt")
-    st.markdown(f"<div class='streak'>🔥 {streak()} Tage Streak · {len(ss.completed)} Tage erledigt</div>", unsafe_allow_html=True)
-
-    st.markdown("### 🏅 Meilensteine")
-    for need, txt in [(1, "Erster Tag"), (7, "Eine Woche"), (14, "Zwei Wochen"), (30, "Ein Monat")]:
-        done = len(ss.completed) >= need
-        st.markdown(f"{'✅' if done else '🔒'} {txt}")
-    if overload_ready():
-        st.markdown("🏋️ **Erstes Gewicht erhöht!** (3× „zu leicht“)")
-
-    st.markdown("### ⚖️ Gewicht")
-    c1, c2 = st.columns([2, 1])
-    nw = c1.number_input("Aktuelles Gewicht (kg)", 35, 250, ss.profile["weight"], key="nw")
-    if c2.button("Speichern", key="save_w"):
-        ss.profile["weight"] = nw
-        ss.weight_log.append((datetime.date.today().isoformat(), nw))
-        st.toast(f"Gespeichert — Kalorien neu berechnet: {macros(ss.profile)['kcal']} kcal/Tag")
-        st.rerun()
-    if len(ss.weight_log) >= 2:
-        try:
-            import pandas as pd
-            df = pd.DataFrame(ss.weight_log, columns=["Datum", "kg"]).set_index("Datum")
-            st.line_chart(df)
-        except Exception:
-            pass
-
-    st.markdown("### 📏 Maße (Umfänge)")
     c1, c2, c3 = st.columns(3)
-    waist = c1.number_input("Taille cm", 40, 200, 80, key="ms_w")
-    arm = c2.number_input("Arm cm", 15, 70, 32, key="ms_a")
-    chest = c3.number_input("Brust cm", 60, 200, 95, key="ms_c")
-    if st.button("Maße speichern"):
-        ss.measure_log.append(dict(date=datetime.date.today().isoformat(), waist=waist, arm=arm, chest=chest))
-        st.toast("Maße gespeichert.")
-    if ss.measure_log:
-        st.caption(f"{len(ss.measure_log)} Einträge gespeichert. Zuletzt: {ss.measure_log[-1]}")
+    stat_tile(c1, "🔥", streak(), "Streak")
+    stat_tile(c2, "✅", len(ss.completed), "Tage erledigt")
+    stat_tile(c3, "📅", current_day(), "Aktueller Tag")
+    st.markdown("<div style='height:10px'></div>", unsafe_allow_html=True)
 
-    st.markdown("### 📸 Fortschritts-Fotos")
-    up = st.file_uploader("Foto hochladen", type=["jpg", "jpeg", "png"], key="photo_up")
-    if up and st.button("Foto speichern"):
-        ss.photos.append((datetime.date.today().isoformat(), up.getvalue()))
-        st.rerun()
-    if ss.photos:
-        cols = st.columns(3)
-        for i, (dte, b) in enumerate(ss.photos[-6:]):
-            cols[i % 3].image(b, caption=dte, use_container_width=True)
+    sub = st.radio("psub", ["🏅 Meilensteine", "⚖️ Gewicht", "📏 Maße", "🍴 Makro-Log"],
+                   horizontal=True, label_visibility="collapsed", key="prog_sub")
 
-    st.markdown("### 🍴 Makro-Log (heute)")
-    today = datetime.date.today().isoformat()
-    log = ss.food_log.setdefault(today, [])
-    c1, c2, c3 = st.columns([2, 1, 1])
-    fname = c1.text_input("Lebensmittel", key="food_name")
-    fprot = c2.number_input("Protein g", 0, 200, 20, key="food_prot")
-    fkcal = c3.number_input("kcal", 0, 2000, 300, key="food_kcal")
-    if st.button("Hinzufügen", key="add_food") and fname:
-        log.append(dict(name=fname, protein=fprot, kcal=fkcal))
-        st.rerun()
-    m = macros(ss.profile)
-    got_p = sum(x["protein"] for x in log)
-    got_k = sum(x["kcal"] for x in log)
-    st.markdown(f"<div class='tip'>Heute: <b>{got_p} / {m['protein']} g Protein</b> · {got_k} / {m['kcal']} kcal. "
-                f"Noch <b>{max(0, m['protein']-got_p)} g</b> Protein.</div>", unsafe_allow_html=True)
-    for x in log:
-        st.markdown(f"- {x['name']} · {x['protein']}g P · {x['kcal']} kcal")
+    if sub == "🏅 Meilensteine":
+        for need, txt, emo in [(1, "Erster Tag", "👟"), (7, "Eine Woche", "🔥"),
+                               (14, "Zwei Wochen", "💪"), (30, "Ein Monat", "🏆")]:
+            done = len(ss.completed) >= need
+            st.markdown(f"<div class='mile {'on' if done else 'off'}'><span style='font-size:20px'>"
+                        f"{emo if done else '🔒'}</span><span>{txt}{' — geschafft!' if done else ''}</span></div>",
+                        unsafe_allow_html=True)
+        if overload_ready():
+            st.markdown("<div class='mile on'><span style='font-size:20px'>🏋️</span>"
+                        "<span>Erstes Gewicht erhöht! (3× zu leicht)</span></div>", unsafe_allow_html=True)
+
+    elif sub == "⚖️ Gewicht":
+        st.caption("Miss dich alle 1–2 Wochen. Die App passt deine Kalorien automatisch an.")
+        c1, c2 = st.columns([2, 1])
+        nw = c1.number_input("Aktuelles Gewicht (kg)", 35, 250, ss.profile["weight"], key="nw")
+        if c2.button("Speichern", key="save_w"):
+            ss.profile["weight"] = nw
+            ss.weight_log.append((datetime.date.today().isoformat(), nw))
+            st.toast(f"Gespeichert — neues Ziel: {macros(ss.profile)['kcal']} kcal/Tag")
+            st.rerun()
+        if len(ss.weight_log) >= 2:
+            try:
+                import pandas as pd
+                df = pd.DataFrame(ss.weight_log, columns=["Datum", "kg"]).set_index("Datum")
+                st.line_chart(df, color="#FF7A1A")
+            except Exception:
+                pass
+        else:
+            st.caption("Ab dem zweiten Eintrag siehst du hier deinen Verlauf als Kurve.")
+
+    elif sub == "📏 Maße":
+        st.caption("Nicht nur die Waage zählt — Umfänge zeigen echte Veränderung.")
+        c1, c2, c3 = st.columns(3)
+        waist = c1.number_input("Taille cm", 40, 200, 80, key="ms_w")
+        arm = c2.number_input("Arm cm", 15, 70, 32, key="ms_a")
+        chest = c3.number_input("Brust cm", 60, 200, 95, key="ms_c")
+        if st.button("Maße speichern"):
+            ss.measure_log.append(dict(date=datetime.date.today().isoformat(), waist=waist, arm=arm, chest=chest))
+            st.toast("Maße gespeichert.")
+            st.rerun()
+        for e in reversed(ss.measure_log[-5:]):
+            card(f"<b>{e['date']}</b><br><span class='muted'>Taille {e['waist']} cm · "
+                 f"Arm {e['arm']} cm · Brust {e['chest']} cm</span>")
+
+    else:
+        st.caption("Logge, was du heute isst — sieh, wie viel Protein noch fehlt.")
+        today = datetime.date.today().isoformat()
+        log = ss.food_log.setdefault(today, [])
+        m = macros(ss.profile)
+        got_p = sum(x["protein"] for x in log)
+        got_k = sum(x["kcal"] for x in log)
+        pct = min(100, round(got_p / m["protein"] * 100)) if m["protein"] else 0
+        st.markdown(f"<div class='card' style='text-align:center'>"
+                    f"<div style='font-size:26px;font-weight:800;color:#27AE60'>{got_p} / {m['protein']} g</div>"
+                    f"<div class='muted'>Protein heute · {got_k} / {m['kcal']} kcal</div>"
+                    f"<div style='height:9px;background:#F0E7DE;border-radius:99px;margin-top:10px;overflow:hidden'>"
+                    f"<div style='height:100%;width:{pct}%;background:#27AE60'></div></div></div>", unsafe_allow_html=True)
+        c1, c2, c3 = st.columns([2, 1, 1])
+        fname = c1.text_input("Lebensmittel", key="food_name")
+        fprot = c2.number_input("Protein g", 0, 200, 20, key="food_prot")
+        fkcal = c3.number_input("kcal", 0, 2000, 300, key="food_kcal")
+        if st.button("Hinzufügen", key="add_food") and fname:
+            log.append(dict(name=fname, protein=fprot, kcal=fkcal))
+            st.rerun()
+        for x in log:
+            st.markdown(f"- **{x['name']}** · {x['protein']} g P · {x['kcal']} kcal")
 
 
 def view_settings():
     st.markdown("## ⚙️ Menü & Einstellungen")
-    st.markdown("### 🤖 KI-Coach (optional)")
-    src = key_source()
-    if src:
-        st.success(f"✅ API-Key erkannt (Quelle: {src}). Der KI-Coach ist aktiv.")
-    else:
-        st.info("Ohne Key funktioniert die App voll — der KI-Coach nutzt dann feste Texte & Mahlzeiten. "
-                "Mit Key werden Coaching & Mahlzeiten individuell erzeugt.")
-    ss.api_key = st.text_input("OpenAI API-Key (überschreibt Secrets)", value=ss.api_key, type="password")
-    st.caption('Auf Streamlit Cloud besser unter Settings → Secrets: OPENAI_API_KEY = "sk-..."')
-
-    st.divider()
     st.markdown("### 🎯 Dein Gym")
     gym = next((g for g in GYMS if g["id"] == ss.gym), None)
     st.write(gym["n"] if gym else "—")
