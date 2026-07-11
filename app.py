@@ -61,8 +61,8 @@ st.markdown("""
   [data-baseweb="popover"] li, [role="option"] { background-color:var(--surface) !important; }
 
   /* Buttons – Apple-Pill */
-  div.stButton > button { border-radius:980px; font-weight:600; padding:.6rem 1.1rem; font-size:15px;
-      background:var(--surface); color:var(--ink) !important; border:1px solid var(--line); width:100%;
+  div.stButton > button { border-radius:980px; font-weight:600; padding:.6rem .9rem; font-size:15px;
+      white-space:nowrap; background:var(--surface); color:var(--ink) !important; border:1px solid var(--line); width:100%;
       transition:transform .12s ease, box-shadow .2s ease, background .2s ease; box-shadow:0 1px 2px rgba(0,0,0,.04); }
   div.stButton > button:hover { border-color:rgba(0,0,0,.18); }
   div.stButton > button:active { transform:scale(.985); }
@@ -673,13 +673,20 @@ def weekday_of(day):
 def is_training_day(day):
     if day <= 3:
         return False
-    if day == 4:
-        return True   # erstes echtes Training (Teil des geführten Einstiegs)
     td = ss.profile.get("train_days")
     if td:
-        return weekday_of(day) in td   # nach den vom User gewählten Wochentagen
+        return weekday_of(day) in td   # strikt nach den gewählten Wochentagen
     idx = (day - 4) % 7
     return idx in TRAIN_SLOTS.get(ss.profile.get("days", 3), {0, 2, 4})
+
+
+def first_training_day():
+    """Erster Journey-Tag ab Tag 4, der auf einen gewählten Wochentag fällt —
+    das ist der geführte 'Erste echte Übungen'-Tag."""
+    for d in range(4, 4 + 21):
+        if is_training_day(d):
+            return d
+    return 4
 
 
 # =============================================================================
@@ -840,12 +847,10 @@ def view_onboarding():
     st.markdown("#### Erzähl uns von dir")
     st.caption("Damit wir alles exakt für dich berechnen — jeder erlebt eine andere App.")
     p = ss.profile
-    c1, c2 = st.columns(2)
-    p["weight"] = c1.number_input("Gewicht (kg)", 35, 250, p["weight"])
-    p["height"] = c2.number_input("Größe (cm)", 130, 220, p["height"])
-    c3, c4 = st.columns(2)
-    p["age"] = c3.number_input("Alter", 14, 90, p["age"])
-    p["sex"] = c4.selectbox("Geschlecht", ["Männlich", "Weiblich", "Divers"],
+    p["weight"] = st.slider("Gewicht (kg)", 35, 250, int(p["weight"]))
+    p["height"] = st.slider("Größe (cm)", 130, 220, int(p["height"]))
+    p["age"] = st.slider("Alter", 14, 90, int(p["age"]))
+    p["sex"] = st.selectbox("Geschlecht", ["Männlich", "Weiblich", "Divers"],
                             index=["Männlich", "Weiblich", "Divers"].index(p["sex"]))
     p["bodytype"] = st.selectbox("Körpertyp", ["Sehr dünn", "Normal", "Übergewichtig"],
                                  index=["Sehr dünn", "Normal", "Übergewichtig"].index(p["bodytype"]))
@@ -887,16 +892,26 @@ def view_result():
 
 
 def days_editor(key):
-    """Wochentag-Auswahl (wiederverwendbar). Gibt True zurück, wenn gültig (≥2)."""
+    """Wochentag-Auswahl über 7 Umschalt-Buttons (robuster als Multiselect).
+    Gibt True zurück, wenn gültig (≥2 Tage gewählt)."""
     p = ss.profile
-    default_wd = [WD[i] for i in p.get("train_days", [0, 2, 4]) if 0 <= i < 7]
-    chosen = st.multiselect("An welchen Tagen willst du ins Gym?", WD, default=default_wd, key=key)
-    idx = sorted(WD.index(x) for x in chosen)
-    if len(idx) >= 2:
-        if idx != p.get("train_days"):
+    cur = set(p.get("train_days", [0, 2, 4]))
+    st.markdown("<div class='muted' style='font-size:14px;margin-bottom:6px'>An welchen Tagen willst du ins Gym? "
+                "(Tippe die Tage an)</div>", unsafe_allow_html=True)
+    cols = st.columns(7)
+    for i, wd in enumerate(WD):
+        sel = i in cur
+        if cols[i].button(wd, key=f"{key}_{i}", type="primary" if sel else "secondary"):
+            if sel:
+                cur.discard(i)
+            else:
+                cur.add(i)
+            idx = sorted(cur)
             p["train_days"] = idx
-            p["days"] = len(idx)
+            p["days"] = max(1, len(idx))
             ss.pop("plan", None)
+            st.rerun()
+    if len(cur) >= 2:
         return True
     st.warning("Bitte wähle mindestens 2 Trainingstage.")
     return False
@@ -1127,9 +1142,11 @@ def view_today():
             ai_workout(day)
 
     # Titel je nach Tag
-    titles = {1: "Mentale Vorbereitung", 2: "Ernährungs-Setup", 3: "Erster Gymbesuch", 4: "Erste echte Übungen"}
+    titles = {1: "Mentale Vorbereitung", 2: "Ernährungs-Setup", 3: "Erster Gymbesuch"}
     if day in titles:
         title = titles[day]
+    elif training and day == first_training_day():
+        title = "Erste echte Übungen"
     elif training:
         title = f"Trainingstag · {ai_workout(day)['name']}"
     else:
@@ -1296,7 +1313,7 @@ def view_progress():
     elif sub == "⚖️ Gewicht":
         st.caption("Miss dich alle 1–2 Wochen. Die App passt deine Kalorien automatisch an.")
         c1, c2 = st.columns([2, 1])
-        nw = c1.number_input("Aktuelles Gewicht (kg)", 35, 250, ss.profile["weight"], key="nw")
+        nw = c1.slider("Aktuelles Gewicht (kg)", 35, 250, int(ss.profile["weight"]), key="nw")
         if c2.button("Speichern", key="save_w"):
             ss.profile["weight"] = nw
             ss.weight_log.append((datetime.date.today().isoformat(), nw))
