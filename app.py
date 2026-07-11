@@ -1080,7 +1080,8 @@ def days_editor(key):
             idx = sorted(cur)
             p["train_days"] = idx
             p["days"] = max(1, len(idx))
-            ss.pop("plan", None)
+            # Kalorien hier NICHT neu berechnen (dauert ~30s per KI) -> schnelles Weiterklicken.
+            # Der Plan wird bei Gewichtsänderung neu berechnet.
             st.rerun()
     if len(cur) >= 2:
         return True
@@ -1094,9 +1095,13 @@ def view_days():
                "und die Übungen passen sich an, je nachdem was du zuletzt trainiert hast.")
     ok = days_editor("days_pick")
     if ok:
-        m = plan()
-        st.markdown(f"<div class='tip'>👍 <b>{ss.profile['days']}× pro Woche.</b> Dein Tagesziel: "
-                    f"<b>{m['kcal']} kcal</b> · {m['protein']} g Protein.</div>", unsafe_allow_html=True)
+        m = ss.get("plan")   # nur anzeigen, NICHT neu berechnen (kein Warten hier)
+        if m:
+            st.markdown(f"<div class='tip'>👍 <b>{ss.profile['days']}× pro Woche.</b> Dein Tagesziel: "
+                        f"<b>{m['kcal']} kcal</b> · {m['protein']} g Protein.</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<div class='tip'>👍 <b>{ss.profile['days']}× pro Woche.</b> "
+                        "Deine Kalorien stehen schon fest — weiter geht's!</div>", unsafe_allow_html=True)
     st.divider()
     if st.button("Weiter →", type="primary", disabled=not ok):
         ss.phase = "commit"
