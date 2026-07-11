@@ -128,7 +128,8 @@ def init_state():
     d.setdefault("phase", "onboarding")
     d.setdefault("profile", dict(weight=75, height=175, age=26, sex="Männlich",
                                  bodytype="Normal", goal="Muskeln aufbauen",
-                                 exp="Noch nie im Gym", days=3, budget="20–40 €"))
+                                 exp="Noch nie im Gym", days=3, train_days=[0, 2, 4],
+                                 budget="20–40 €"))
     d.setdefault("gym", None)
     d.setdefault("start_date", None)
     d.setdefault("completed", set())
@@ -153,7 +154,7 @@ ss = st.session_state
 # =============================================================================
 # BERECHNUNGEN (Mifflin-St Jeor, keine API)
 # =============================================================================
-ACT = {2: 1.2, 3: 1.375, 4: 1.46, 5: 1.55}
+ACT = {1: 1.2, 2: 1.2, 3: 1.375, 4: 1.46, 5: 1.55, 6: 1.6, 7: 1.7}
 
 
 def bmr(p):
@@ -286,6 +287,18 @@ EXERCISES = {
                        desc="Du rollst den Oberkörper gegen Widerstand ein — kräftigt gezielt die Bauchmuskeln.",
                        setup="Griffe fassen, Brustpolster an der Brust.",
                        warn="Aus dem Bauch einrollen, nicht am Nacken ziehen."),
+    "Butterfly (Brust)": dict(m="Brust", vid="4x9DdhvieI4",
+                       desc="Du führst zwei Griffe vor der Brust zusammen — isoliert und formt die Brust sichtbar.",
+                       setup="Griffe auf Brusthöhe, Arme leicht angewinkelt, Rücken an die Lehne.",
+                       warn="Kontrolliert zusammenführen — nicht mit Schwung zuschlagen."),
+    "Bizeps-Curl (Maschine)": dict(m="Bizeps", vid="o5kPXkSv26Y",
+                       desc="Du beugst die Arme gegen Widerstand — baut gezielt den Bizeps auf.",
+                       setup="Oberarme liegen ganz auf dem Polster, Ellbogen auf der Drehachse.",
+                       warn="Nicht mit Schwung reißen — langsam beugen und strecken."),
+    "Trizepsdrücken (Kabel)": dict(m="Trizeps", vid="yk6VdVwww5k",
+                       desc="Du drückst Stange oder Seil nach unten — formt die Rückseite des Oberarms.",
+                       setup="Ellbogen eng am Körper fixieren, aufrecht stehen.",
+                       warn="Nur die Unterarme bewegen sich — Ellbogen bleiben am Körper."),
 }
 EX_LIST = list(EXERCISES.keys())
 
@@ -310,16 +323,43 @@ def overload_ready():
     return run >= 3
 
 
+# Strukturierte Trainingseinheiten (gezielte Muskelgruppen statt bloßer Rotation)
+SESSIONS = {
+    "Ganzkörper A": ["Beinpresse", "Brustpresse (Maschine)", "Latzug (Kabelzug)", "Bauchmaschine"],
+    "Ganzkörper B": ["Beinbeuger", "Schulterpresse (Maschine)", "Rudern (Maschine)", "Beinstrecker"],
+    "Push (Drücken)": ["Brustpresse (Maschine)", "Schulterpresse (Maschine)", "Butterfly (Brust)", "Trizepsdrücken (Kabel)"],
+    "Pull (Ziehen)": ["Latzug (Kabelzug)", "Rudern (Maschine)", "Bizeps-Curl (Maschine)"],
+    "Beine": ["Beinpresse", "Beinbeuger", "Beinstrecker", "Bauchmaschine"],
+    "Oberkörper": ["Brustpresse (Maschine)", "Latzug (Kabelzug)", "Schulterpresse (Maschine)",
+                   "Rudern (Maschine)", "Bizeps-Curl (Maschine)", "Trizepsdrücken (Kabel)"],
+    "Unterkörper": ["Beinpresse", "Beinbeuger", "Beinstrecker", "Bauchmaschine"],
+}
+WD = ["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]
+
+
+def plan_sessions():
+    """Welche Einheiten rotiert werden — je nach Trainingstagen pro Woche."""
+    d = ss.profile.get("days", 3)
+    if d <= 3:
+        return ["Ganzkörper A", "Ganzkörper B"]          # Anfänger: Ganzkörper = bester Muskelaufbau
+    if d == 4:
+        return ["Oberkörper", "Unterkörper"]             # Upper/Lower-Split
+    return ["Push (Drücken)", "Pull (Ziehen)", "Beine"]  # Push/Pull/Legs
+
+
 def training_day_number(day):
-    """Wie oft wurde bis zu diesem Journey-Tag trainiert (für Progression)."""
+    """Wievielte Trainingseinheit ist dieser Journey-Tag (für Progression & Rotation)."""
     return sum(1 for d in range(4, day + 1) if is_training_day(d))
 
 
+def session_for(day):
+    sess = plan_sessions()
+    idx = max(0, training_day_number(day) - 1)
+    return sess[idx % len(sess)]
+
+
 def exercises_for(day):
-    n = training_day_number(day)
-    count = 3 if n <= 2 else 4 if n <= 6 else 5
-    start = (n * 2) % len(EX_LIST)
-    return [EX_LIST[(start + i) % len(EX_LIST)] for i in range(count)]
+    return [n for n in SESSIONS[session_for(day)] if n in EXERCISES]
 
 
 def sets_reps(day):
@@ -329,17 +369,26 @@ def sets_reps(day):
     return sets, max(8, min(reps, 15))
 
 
-# Trainingsrhythmus ab Tag 5 (Ruhetage eingebaut)
+# Trainingsrhythmus (Fallback, falls keine Wochentage gewählt)
 TRAIN_SLOTS = {2: {0, 3}, 3: {0, 2, 4}, 4: {0, 1, 3, 4}, 5: {0, 1, 2, 3, 4}}
+
+
+def weekday_of(day):
+    if not ss.start_date:
+        return (day - 1) % 7
+    return (ss.start_date + datetime.timedelta(days=day - 1)).weekday()
 
 
 def is_training_day(day):
     if day <= 3:
         return False
     if day == 4:
-        return True
+        return True   # erstes echtes Training (Teil des geführten Einstiegs)
+    td = ss.profile.get("train_days")
+    if td:
+        return weekday_of(day) in td   # nach den vom User gewählten Wochentagen
     idx = (day - 4) % 7
-    return idx in TRAIN_SLOTS.get(ss.profile["days"], {0, 2, 4})
+    return idx in TRAIN_SLOTS.get(ss.profile.get("days", 3), {0, 2, 4})
 
 
 # =============================================================================
@@ -556,8 +605,10 @@ def find_real_gyms(city):
             return None
         lat, lon = float(geo[0]["lat"]), float(geo[0]["lon"])
         oq = (f'[out:json][timeout:25];('
-              f'node["leisure"="fitness_centre"](around:6000,{lat},{lon});'
-              f'way["leisure"="fitness_centre"](around:6000,{lat},{lon}););out center 50;')
+              f'nwr["leisure"="fitness_centre"](around:8000,{lat},{lon});'
+              f'nwr["sport"="fitness"](around:8000,{lat},{lon});'
+              f'nwr["leisure"="sports_centre"]["fitness_centre"="yes"](around:8000,{lat},{lon});'
+              f');out center 150;')
         data = _http_get_json("https://overpass-api.de/api/interpreter?data=" + q(oq), ua=True)
         gyms, seen = [], set()
         for el in data.get("elements", []):
@@ -573,7 +624,7 @@ def find_real_gyms(city):
                              hours=tags.get("opening_hours", ""),
                              website=tags.get("website", "") or tags.get("contact:website", "")))
         gyms.sort(key=lambda g: g["dist"])
-        cache[key] = dict(center=(lat, lon), gyms=gyms[:8])
+        cache[key] = dict(center=(lat, lon), gyms=gyms[:20])
         return cache[key]
     except Exception:
         cache[key] = None
@@ -601,13 +652,21 @@ def view_onboarding():
                              index=["Muskeln aufbauen", "Abnehmen", "Fitter werden", "Allgemeine Gesundheit"].index(p["goal"]))
     p["exp"] = st.selectbox("Gym-Erfahrung", ["Noch nie im Gym", "Kurz reingeschaut", "Leichte Erfahrung"],
                             index=["Noch nie im Gym", "Kurz reingeschaut", "Leichte Erfahrung"].index(p["exp"]))
-    p["days"] = st.select_slider("Tage pro Woche", [2, 3, 4, 5], p["days"])
+    default_wd = [WD[i] for i in p.get("train_days", [0, 2, 4]) if 0 <= i < 7]
+    chosen = st.multiselect("An welchen Tagen willst du ins Gym?", WD, default=default_wd,
+                            help="Wähle 2–5 Tage. Danach richtet sich dein Wochenplan.")
+    p["train_days"] = sorted(WD.index(x) for x in chosen)
+    p["days"] = max(1, len(p["train_days"]))
     p["budget"] = st.selectbox("Budget fürs Gym", ["Bis 20 €", "20–40 €", "40 €+"],
                                index=["Bis 20 €", "20–40 €", "40 €+"].index(p["budget"]))
     st.divider()
-    if st.button("Plan berechnen ✨", type="primary"):
+    enough = len(p["train_days"]) >= 2
+    if not enough:
+        st.warning("Bitte wähle mindestens 2 Trainingstage.")
+    if st.button("Plan berechnen ✨", type="primary", disabled=not enough):
         if not ss.weight_log:
             ss.weight_log = [(datetime.date.today().isoformat(), p["weight"])]
+        ss.pop("plan", None)
         ss.phase = "result"
         st.rerun()
 
@@ -665,8 +724,13 @@ def view_gym():
     except Exception:
         pass
 
-    st.caption(f"{len(result['gyms'])} echte Studios gefunden · nach Entfernung sortiert.")
-    for i, g in enumerate(result["gyms"]):
+    flt = st.text_input("Nach Name filtern (z. B. Fitinn, McFit …)", key="gym_filter").strip().lower()
+    gyms = [g for g in result["gyms"] if flt in g["n"].lower()] if flt else result["gyms"]
+    if not gyms:
+        st.caption("Kein Studio mit diesem Namen in der Nähe gefunden. Lösch den Filter, um alle zu sehen.")
+    else:
+        st.caption(f"{len(gyms)} Studios · nach Entfernung sortiert.")
+    for i, g in enumerate(gyms):
         rec = "<div class='badge green' style='margin-top:8px'>✅ Am nächsten zu dir</div>" if i == 0 else ""
         extra = f"<br><span class='muted' style='font-size:12px'>🕒 {g['hours']}</span>" if g["hours"] else ""
         web = f" · <a href='{g['website']}' target='_blank'>Website</a>" if g["website"] else ""
@@ -735,21 +799,28 @@ def render_meals(m, meals):
 
 def workout_block(day):
     sets, reps = sets_reps(day)
-    st.markdown("### 🏋️ Heutiges Workout")
-    st.markdown(f"<div class='tip'>ℹ️ <b>Was bedeutet Sätze × Wiederholungen?</b> Eine <b>Wiederholung</b> ist eine "
-                f"komplette Bewegung. Ein <b>Satz</b> ist eine Runde am Stück — danach 1–2 Min Pause, dann der nächste Satz.</div>",
+    session = session_for(day)
+    ex = exercises_for(day)
+    muscles = " · ".join(dict.fromkeys(EXERCISES[n]["m"] for n in ex))
+    st.markdown(f"### 🏋️ {session}")
+    st.markdown(f"<div class='badge'>Heute: {muscles}</div>", unsafe_allow_html=True)
+    st.caption("Aufwärmen: 5 Min lockeres Cardio, dann bei jeder Übung 1 leichter Aufwärmsatz.")
+    st.markdown("<div class='tip'>ℹ️ <b>Was bedeutet Sätze × Wiederholungen?</b> Eine <b>Wiederholung</b> ist eine "
+                "komplette Bewegung. Ein <b>Satz</b> ist eine Runde am Stück — danach 1–2 Min Pause, dann der nächste Satz.</div>",
                 unsafe_allow_html=True)
     if overload_ready():
         st.markdown("<div class='badge'>🚀 Progressive Overload: Zeit, das Gewicht leicht zu erhöhen!</div>", unsafe_allow_html=True)
-    for name in exercises_for(day):
+    for i, name in enumerate(ex, 1):
         info = EXERCISES[name]
-        st.markdown(f"**{name}** · _{info['m']}_")
+        st.markdown(f"**{i}. {name}** · _{info['m']}_")
         st.markdown(f"<div class='setpill'>🔁 {sets} Sätze × {reps} Wiederholungen · ⏱ ~90 Sek. Pause</div>", unsafe_allow_html=True)
         st.video(f"https://www.youtube.com/watch?v={info['vid']}")
         st.markdown(f"<div class='tip'>✅ <b>Einstellung:</b> {info['setup']}</div>", unsafe_allow_html=True)
         st.markdown(f"<div class='warn'>⚠️ {info['warn']}</div>", unsafe_allow_html=True)
         st.markdown("<div style='height:4px'></div>", unsafe_allow_html=True)
-    st.markdown("<p class='muted' style='font-size:13px'>💡 Einstiegsregel: So leicht, dass du fast lachst. Nächste Woche mehr.</p>", unsafe_allow_html=True)
+    st.markdown("<div class='tip'>📈 <b>So baust du Muskeln auf:</b> Schaffst du alle Sätze mit sauberer Technik locker, "
+                "nimm beim nächsten Mal die kleinste Gewichtsstufe mehr. Genau dieses schrittweise Steigern "
+                "(Progressive Overload) + genug Protein + Schlaf lässt den Muskel wachsen.</div>", unsafe_allow_html=True)
 
 
 def feedback_block(day):
@@ -830,7 +901,7 @@ def view_today():
     if day in titles:
         title = titles[day]
     elif training:
-        title = "Trainingstag"
+        title = f"Trainingstag · {session_for(day)}"
     else:
         title = "Ruhetag & Erholung"
     st.markdown(f"## {title}")
@@ -907,20 +978,30 @@ def view_today():
 
 def view_week():
     p = ss.profile
+    td = p.get("train_days", [0, 2, 4])
+    sess = plan_sessions()
     st.markdown("## 🗓 Dein Wochenplan")
-    st.caption(f"{plan_name(p)} · {p['days']}× Training pro Woche.")
-    slots = TRAIN_SLOTS.get(p["days"], {0, 2, 4})
-    focus_up = {2: ["Ganzkörper A", "Ganzkörper B"], 3: ["Push", "Pull", "Beine"],
-                4: ["Oberkörper", "Unterkörper", "Oberkörper", "Unterkörper"],
-                5: ["Push", "Pull", "Beine", "Oberkörper", "Unterkörper"]}.get(p["days"], ["Ganzkörper"])
-    tnum = 0
-    for i, tag in enumerate(["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"]):
-        if i in slots:
-            f = focus_up[tnum % len(focus_up)] if p["goal"] == "Muskeln aufbauen" else \
-                ("Ganzkörper + Cardio" if p["goal"] == "Abnehmen" else "Ganzkörper-Basis")
-            tnum += 1
+    st.caption(f"{plan_name(p)} · {len(td)}× pro Woche · deine gewählten Tage. "
+               f"Einheiten rotieren: {' · '.join(sess)}.")
+    with st.expander("🗓 Trainingstage ändern"):
+        new_td = st.multiselect("An welchen Tagen willst du ins Gym?", WD,
+                                default=[WD[i] for i in td], key="wk_td")
+        if st.button("Speichern", key="wk_save", disabled=len(new_td) < 2):
+            p["train_days"] = sorted(WD.index(x) for x in new_td)
+            p["days"] = max(1, len(p["train_days"]))
+            ss.pop("plan", None)
+            st.toast("Wochenplan aktualisiert.")
+            st.rerun()
+        if len(new_td) < 2:
+            st.caption("Mindestens 2 Tage wählen.")
+    ti = 0
+    for i, tag in enumerate(WD):
+        if i in td:
+            s = sess[ti % len(sess)]
+            ti += 1
+            exs = ", ".join(SESSIONS[s])
             st.markdown(f"<div class='wkrow train'><div class='wkday'>{tag}</div><div>"
-                        f"<div class='wktitle'>🏋️ Training {tnum}</div><div class='wkfocus'>{f}</div></div></div>",
+                        f"<div class='wktitle'>🏋️ {s}</div><div class='wkfocus'>{exs}</div></div></div>",
                         unsafe_allow_html=True)
         else:
             st.markdown(f"<div class='wkrow'><div class='wkday'>{tag}</div><div>"
